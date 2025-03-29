@@ -10,8 +10,8 @@ const generateTokenAndSetCookies = (res, userId) => {
         const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: "7d" })
         res.cookie('token', token, {
             httpOnly: true,
-            sameSite: 'Lax',
-            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'None',
+            secure: true,
             maxAge: 604800000
         })
         return token;

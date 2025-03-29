@@ -18,7 +18,6 @@ const brandRouter = require('./routes/brand.js')
 
 dotenv.config()
 const app = express();
-
 app.use(cors({
     origin: ['http://localhost:5173' , 'https://etimad.netlify.app'],
     credentials: true
