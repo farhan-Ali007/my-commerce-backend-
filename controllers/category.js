@@ -49,12 +49,12 @@ const createCategory = async (req, res) => {
 const getAllCategories = async (req, res) => {
     try {
         // Fetch all categories
-        const categories = await Category.find({}).select("name slug Image");
+        const categories = await Category.find({}).select("name slug Image menu");
 
         // For each category, populate its subcategories
         const categoriesWithSubcategories = await Promise.all(
             categories.map(async (category) => {
-                const subcategories = await Sub.find({ category: category._id }).select("name slug");
+                const subcategories = await Sub.find({ category: category._id }).select("name slug ");
                 return {
                     ...category.toObject(),
                     subcategories
@@ -97,4 +97,55 @@ const deleteCategory = async (req, res) => {
     }
 }
 
-module.exports = { createCategory, getAllCategories, deleteCategory, }
+const updateMenuStatus = async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { menu } = req.body;
+  
+      // Validate input
+      if (typeof menu !== 'boolean') {
+        return res.status(400).json({ message: "Invalid menu status" });
+      }
+  
+      const category = await Category.findByIdAndUpdate(
+        id,
+        { menu },
+        { new: true, runValidators: true }
+      );
+      
+      if (!category) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+  
+      res.status(200).json({
+        success: true,
+        message: `Menu status ${menu ? 'enabled' : 'disabled'}`,
+        category,
+      });
+    } catch (error) {
+      console.error("Error updating menu status", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+  const getMenuCategories = async (req, res) => {
+    try {
+        const categories = await Category.find({ menu: true })
+        const categoriesWithSubcategories = await Promise.all(
+            categories.map(async (category) => {
+                const subcategories = await Sub.find({ category: category._id }).select("name slug");
+                return {
+                    ...category.toObject(),
+                    subcategories
+                };
+            })
+        );
+
+        res.status(200).json({ success: true, categories:categoriesWithSubcategories });
+    } catch (error) {
+        console.error("Error fetching menu categories:", error);
+        res.status(500).json({ success: false, message: "Failed to fetch menu categories" });
+    }
+};
+
+module.exports = { createCategory, getAllCategories, deleteCategory,updateMenuStatus , getMenuCategories} 

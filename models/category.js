@@ -15,6 +15,10 @@ const categorySchema = new mongoose.Schema({
     Image: {
         type: String,
         default: ""
+    },
+    menu:{
+        type: Boolean,
+        default: false
     }
 }, { timestamps: true })
 
