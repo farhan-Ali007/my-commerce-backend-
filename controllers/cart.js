@@ -15,11 +15,10 @@ const addItemToCart = async (req, res) => {
         console.log("userId---->", userId)
         if (!req.cookies?.guestId) {
             res.cookie('guestId', userId, {
-                maxAge: 30 * 24 * 60 * 60 * 1000,
                 httpOnly: true,
+                sameSite: 'None',
                 secure: true,
-                sameSite: 'none',
-                domain: process.env.NODE_ENV === 'production' ? 'https://etimad.netlify.app/' : undefined,
+                maxAge: 604800000 // 7 days
             });
         }
     }
