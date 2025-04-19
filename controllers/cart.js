@@ -7,8 +7,8 @@ const addItemToCart = async (req, res) => {
     let userId = req.body.userId;
     const isGuest = !userId;
 
-    // console.log("coming cart---->", cart)
-    // console.log("Cookies in request--------->", req.cookies);
+    console.log("coming cart---->", cart)
+    console.log("Cookies in request--------->", req.cookies);
 
     if (isGuest) {
         userId = req.cookies?.guestId || uuidv4();
@@ -16,7 +16,10 @@ const addItemToCart = async (req, res) => {
         if (!req.cookies?.guestId) {
             res.cookie('guestId', userId, {
                 maxAge: 30 * 24 * 60 * 60 * 1000,
-                httpOnly: true
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+                domain: process.env.NODE_ENV === 'production' ? 'https://etimad.netlify.app/' : undefined,
             });
         }
     }
@@ -79,6 +82,9 @@ const addItemToCart = async (req, res) => {
 const getCart = async (req, res) => {
     const { userId } = req.params;
     const guestId = req.cookies?.guestId;
+
+    console.log("coming userId------>", userId)
+    console.log("coming guestId------>", guestId)
 
     try {
         let cart;
