@@ -15,15 +15,14 @@ const uploadImage = async (file, type = "product") => {
         const folderName = type === "banner" ? "banners" : "product-images";
 
         // Set transformation based on type
-        const transformation =
-            type === "banner"
-                ? [{ width: 1920, height: 700, crop: "scale" }] // Banner size
-                : [{ width: 500, height: 500, crop: "limit" }]; // Product size
+        // const transformation =
+        //     type === "banner"
+        //         ? [{ width: 1920, height: 700, crop: "scale" }] // Banner size
+        //         : [{ width: 500, height: 500, crop: "limit" }]; // Product size
 
         const uploadResult = await cloudinary.uploader.upload(file.path, {
             folder: folderName,
             allowed_formats: ["jpg", "jpeg", "png", "webp"],
-            transformation,
         });
 
         return {
