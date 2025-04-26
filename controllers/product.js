@@ -58,7 +58,8 @@ const createProduct = async (req, res) => {
         // Validate category and subcategory
         const categoryDoc = await validateCategory(category);
         const subCategoryDoc = await validateSubCategory(subCategory);
-        const brandDoc = await validateBrand(brand);
+        const brandDoc = brand ? await validateBrand(brand) : null;
+
         if (!brandDoc) return res.status(400).json({ message: "Invalid brand." });
         if (!categoryDoc) {
             return res.status(400).json({ message: "Invalid category or subcategory." });
@@ -90,7 +91,7 @@ const createProduct = async (req, res) => {
             subCategory: subCategoryDoc?._id || null,
             stock,
             sold: 0,
-            brand: brandDoc._id,
+            brand: brandDoc._id || null,
             tags: tagIds,
             variants: uploadedVariants,
             images: uploadedImages,
@@ -219,10 +220,13 @@ const updateProduct = async (req, res) => {
             existingImages
         } = req.body;
 
-        console.log("coming slug in update controller ------>", slug);
-        console.log("Coming data in update controller from frontend------>", req.body);
-        console.log("coming variants in update controller from frontend ------->", variants)
-        console.log("coming images in update controller from frontend ----------->", req.files);
+        // console.log("coming slug in update controller ------>", slug);
+        console.log("Coming data in update controller from frontend------>", req.body)
+        console.log("subCategory field in request body:", req.body.subCategory);
+        // console.log("coming variants in update controller from frontend ------->", variants)
+        // console.log("coming category typeof in update controller from frontend ------->", typeof category)
+        // console.log("coming subcategory in update controller from frontend ------->", subCategory)
+        // console.log("coming images in update controller from frontend ----------->", req.files);
 
         const product = await Product.findOne({ slug });
         if (!product) return res.status(404).json({ message: "Product not found." });
@@ -250,25 +254,24 @@ const updateProduct = async (req, res) => {
         }
 
         let categoryId = product.category;
-        if (category) {
-            let categoryData;
-            try {
-                categoryData = typeof category === 'string' ? JSON.parse(category) : category;
-            } catch (error) {
-                categoryData = category;
-            }
+        // console.log("Category id before update------->", typeof categoryId)
 
-            if (typeof categoryData === 'object' && categoryData._id) {
-                categoryId = categoryData._id;
-            } else if (typeof categoryData === 'string') {
-                const categoryObj = await Category.findOne({ name: categoryData.toLowerCase() });
-                if (!categoryObj) {
-                    return res.status(400).json({ message: "Category not found." });
+        if (category) {
+            if (mongoose.Types.ObjectId.isValid(category)) {
+                const categoryObjectId = new mongoose.Types.ObjectId(category); // Convert string to ObjectId
+                console.log("Category ObjectId to be queried:", categoryObjectId);
+
+                const categoryExists = await Category.findById(categoryObjectId);
+                console.log("Category Query Result:", categoryExists);
+
+                if (!categoryExists) {
+                    return res.status(404).json({ message: `Category not found for ID: ${category}` });
                 }
-                categoryId = categoryObj._id;
+                product.category = categoryObjectId; // Assign as ObjectId
+            } else {
+                return res.status(400).json({ message: "Invalid category ID format." });
             }
         }
-
         // Handle brand
         let brandId = product.brand;
         if (brand) {
@@ -291,6 +294,8 @@ const updateProduct = async (req, res) => {
         }
 
         let subCategoryId = product.subCategory;
+        console.log("Subcategory id before update------->", subCategoryId);
+
         if (subCategory) {
             let subCategoryData;
             try {
@@ -300,16 +305,38 @@ const updateProduct = async (req, res) => {
             }
 
             if (typeof subCategoryData === 'object' && subCategoryData._id) {
+                // Verify the subcategory exists in DB
+                const subCategoryObj = await SubCategory.findById(subCategoryData._id);
+                if (!subCategoryObj) {
+                    return res.status(400).json({ message: "SubCategory not found." });
+                }
                 subCategoryId = subCategoryData._id;
             } else if (typeof subCategoryData === 'string') {
-                const subCategoryObj = await SubCategory.findOne({ name: subCategoryData?.toLowerCase() });
-                if (!subCategoryObj) {
-                    return res.status(400).json({ message: "Category not found." });
-                }
-                subCategoryId = subCategoryObj._id;
-            }
-        }
+                console.log("Searching for subcategory:", subCategoryData);
 
+                // First check if it's a valid ObjectId
+                if (mongoose.Types.ObjectId.isValid(subCategoryData)) {
+                    const subCategoryObj = await SubCategory.findById(subCategoryData);
+                    console.log("Found subcategory by ID:", subCategoryObj);
+                    if (!subCategoryObj) {
+                        return res.status(400).json({ message: "SubCategory not found." });
+                    }
+                    subCategoryId = subCategoryObj._id;
+                } else {
+                    // If not an ObjectId, search by name
+                    const subCategoryObj = await SubCategory.findOne({
+                        name: subCategoryData.toLowerCase()
+                    });
+                    console.log("Found subcategory by name:", subCategoryObj);
+                    if (!subCategoryObj) {
+                        return res.status(400).json({ message: "SubCategory not found." });
+                    }
+                    subCategoryId = subCategoryObj._id;
+                }
+            }
+
+            console.log("Subcategory id after update------->", subCategoryId);
+        }
 
         // Handling the images update
         let updatedImages = [];
@@ -373,7 +400,7 @@ const updateProduct = async (req, res) => {
             });
         }
 
-        
+
         product.title = title || product.title;
         product.description = description || product.description;
         product.longDescription = longDescription || product.longDescription
@@ -454,6 +481,7 @@ const getProductBySlug = async (req, res) => {
 
         const product = await Product.findOne({ slug })
             .populate('category', 'name')
+            .populate('subCategory', 'name')
             .populate('tags', 'name')
             .populate('brand', 'name')
             .populate({
@@ -567,8 +595,8 @@ const getRelatedProducts = async (req, res) => {
         // If no related products are found, fetch random products
         if (relatedProducts.length === 0) {
             relatedProducts = await Product.aggregate([
-                { $match: { _id: { $ne: new mongoose.Types.ObjectId(excludeProductId) } } }, 
-                { $sample: { size: Number(limit) } } 
+                { $match: { _id: { $ne: new mongoose.Types.ObjectId(excludeProductId) } } },
+                { $sample: { size: Number(limit) } }
             ]);
 
             relatedProducts = await Product.populate(relatedProducts, [
@@ -601,22 +629,146 @@ const getRelatedProducts = async (req, res) => {
 const getBestSellers = async (req, res) => {
     try {
         const { page = 1, limit = 4 } = req.query;
-
         const skip = (page - 1) * limit;
 
-        const totalProducts = await Product.countDocuments({ sold: { $gt: 0 } });
-        const totalPages = Math.ceil(totalProducts / limit);
+        const bestSellerTag = await Tag.findOne({ name: 'best seller' });
+        
+        // Create aggregation pipeline
+        const aggregationPipeline = [];
+        
+        // First stage: Match products with best seller tag if exists
+        if (bestSellerTag) {
+            aggregationPipeline.push({
+                $match: { tags: { $in: [bestSellerTag._id] } }
+            });
+            
+            // Add a field to mark these as tagged best sellers
+            aggregationPipeline.push({
+                $addFields: { isTaggedBestSeller: true }
+            });
+        }
+        
+        // Second stage: Union with top selling products
+        aggregationPipeline.push({
+            $unionWith: {
+                coll: 'products',
+                pipeline: [
+                    // Exclude already included tagged products if they exist
+                    bestSellerTag ? { 
+                        $match: { 
+                            $and: [
+                                { tags: { $nin: [bestSellerTag._id] } },
+                                { sold: { $gt: 0 } }
+                            ]
+                        }
+                    } : { $match: { sold: { $gt: 0 } } },
+                    // Add field to mark these as top sellers
+                    { $addFields: { isTaggedBestSeller: false } }
+                ]
+            }
+        });
+        
+        // Sorting and limiting
+        aggregationPipeline.push(
+            { 
+                $sort: { 
+                    isTaggedBestSeller: -1, // Tagged products first
+                    sold: -1,               // Then by sales
+                    createdAt: -1           // Then by newest
+                } 
+            },
+            { $skip: skip },
+            { $limit: Number(limit) }
+        );
+        
+        // Lookup for related data
+        aggregationPipeline.push(
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: 'category',
+                    foreignField: '_id',
+                    as: 'category'
+                }
+            },
+            { $unwind: '$category' },
+            {
+                $lookup: {
+                    from: 'tags',
+                    localField: 'tags',
+                    foreignField: '_id',
+                    as: 'tags'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'brands',
+                    localField: 'brand',
+                    foreignField: '_id',
+                    as: 'brand'
+                }
+            },
+            { $unwind: { path: '$brand', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'reviews',
+                    localField: 'reviews',
+                    foreignField: '_id',
+                    as: 'reviews'
+                }
+            },
+            {
+                $addFields: {
+                    averageRating: {
+                        $cond: {
+                            if: { $gt: [{ $size: '$reviews' }, 0] },
+                            then: { $avg: '$reviews.rating' },
+                            else: 0
+                        }
+                    }
+                }
+            }
+        );
 
-        const products = await Product.find({ sold: { $gt: 0 } })
-            .sort({ sold: -1 })
-            .skip(skip)
-            .limit(Number(limit))
-            .populate('category', 'name')
-            .populate('tags', 'name')
+        // Execute aggregation
+        const products = await Product.aggregate(aggregationPipeline);
+        
+        // Count total best sellers (both tagged and top selling)
+        const countPipeline = [];
+        
+        if (bestSellerTag) {
+            countPipeline.push({
+                $match: { tags: { $in: [bestSellerTag._id] } }
+            });
+        }
+        
+        countPipeline.push({
+            $unionWith: {
+                coll: 'products',
+                pipeline: [
+                    bestSellerTag ? { 
+                        $match: { 
+                            $and: [
+                                { tags: { $nin: [bestSellerTag._id] } },
+                                { sold: { $gt: 0 } }
+                            ]
+                        }
+                    } : { $match: { sold: { $gt: 0 } } }
+                ]
+            }
+        });
+        
+        countPipeline.push({ $count: 'total' });
+        
+        const countResult = await Product.aggregate(countPipeline);
+        const totalProducts = countResult[0]?.total || 0;
+        const totalPages = Math.ceil(totalProducts / limit);
 
         res.status(200).json({
             success: true,
-            message: 'Best-selling products fetched successfully',
+            message: bestSellerTag 
+                ? 'Best-seller tagged and top selling products fetched successfully' 
+                : 'Top selling products fetched successfully',
             currentPage: Number(page),
             totalPages,
             totalProducts,
@@ -663,6 +815,137 @@ const getProductsBySubCategory = async (req, res) => {
     }
 };
 
+const getFeaturedProducts = async (req, res) => {
+    try {
+        const { page = 1, limit = 8 } = req.query;
+        const skip = (page - 1) * limit;
+
+        const featuredTag = await Tag.findOne({ name: 'featured' });
+        if (!featuredTag) {
+            return res.status(200).json({
+                success: true,
+                message: 'No featured tag found',
+                products: [],
+                currentPage: 1,
+                totalPages: 0,
+                totalProducts: 0
+            });
+        }
+
+        const totalProducts = await Product.countDocuments({
+            tags: { $in: [featuredTag._id] }
+        });
+
+        const totalPages = Math.ceil(totalProducts / limit);
+
+        // Get featured products with pagination
+        const products = await Product.find({ tags: { $in: [featuredTag._id] } })
+            .populate('category', 'name')
+            .populate('tags', 'name')
+            .populate('brand', 'name')
+            .populate({
+                path: 'reviews',
+                select: 'rating reviewText',
+                populate: {
+                    path: 'reviewerId',
+                    select: 'name email'
+                }
+            })
+            .skip(skip)
+            .sort([['updatedAt', 'desc'], ['createdAt', 'desc']])
+            .limit(limit);
+
+        // Calculate average rating for each product
+        products.forEach(product => {
+            const totalRating = product.reviews.reduce((acc, review) => acc + review.rating, 0);
+            product.averageRating = product.reviews.length > 0 ?
+                totalRating / product.reviews.length : 0;
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'Featured products fetched successfully',
+            currentPage: Number(page),
+            totalPages,
+            totalProducts,
+            products
+        });
+    } catch (error) {
+        console.error("Error in fetching featured products", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+const getNewArrivals = async (req, res) => {
+    try {
+        const { page = 1, limit = 8 } = req.query;
+        const skip = (page - 1) * limit;
+
+        // First find the new tag
+        const newTag = await Tag.findOne({ name: 'new' });
+        if (!newTag) {
+            return res.status(200).json({
+                success: true,
+                message: 'No new arrivals tag found',
+                products: [],
+                currentPage: 1,
+                totalPages: 0,
+                totalProducts: 0
+            });
+        }
+
+        // Count total new arrival products
+        const totalProducts = await Product.countDocuments({
+            $and: [
+                { tags: { $in: [newTag._id] } },
+                { createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } // Last 30 days
+            ]
+        });
+
+        const totalPages = Math.ceil(totalProducts / limit);
+
+        // Get new arrival products with pagination
+        const products = await Product.find({
+            $and: [
+                { tags: { $in: [newTag._id] } },
+                { createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } // Last 30 days
+            ]
+        })
+            .populate('category', 'name')
+            .populate('tags', 'name')
+            .populate('brand', 'name')
+            .populate({
+                path: 'reviews',
+                select: 'rating reviewText',
+                populate: {
+                    path: 'reviewerId',
+                    select: 'name email'
+                }
+            })
+            .skip(skip)
+            .sort({ createdAt: -1 })
+            .limit(limit);
+
+        products.forEach(product => {
+            const totalRating = product.reviews.reduce((acc, review) => acc + review.rating, 0);
+            product.averageRating = product.reviews.length > 0 ?
+                totalRating / product.reviews.length : 0;
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'New arrival products fetched successfully',
+            currentPage: Number(page),
+            totalPages,
+            totalProducts,
+            products
+        });
+    } catch (error) {
+        console.error("Error in fetching new arrival products", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
 module.exports = {
     createProduct,
     getProductBySlug,
@@ -673,4 +956,6 @@ module.exports = {
     getRelatedProducts,
     getBestSellers,
     getProductsBySubCategory,
+    getFeaturedProducts,
+    getNewArrivals,
 };

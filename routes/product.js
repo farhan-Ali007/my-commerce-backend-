@@ -15,14 +15,18 @@ const {
     getBestSellers,
     getProductBySlug,
     getProductsBySubCategory,
+    getFeaturedProducts,
+    getNewArrivals,
 } = require('../controllers/product')
 
 // 🟢 Place specific routes BEFORE dynamic ones
-router.get('/my-products',isAuthorized, isAdmin, getMyProducts)
+router.get('/my-products', isAuthorized, isAdmin, getMyProducts)
 router.get('/getAll', getAllProducts)
 router.get('/best-sellers', getBestSellers)
 router.get('/sub/:subCategory', getProductsBySubCategory)
 router.get('/related/:categoryId/:excludeProductId', getRelatedProducts)
+router.get('/featured', getFeaturedProducts)
+router.get('/new-arrivals', getNewArrivals)
 
 // 🟢 Dynamic routes should come LAST
 router.get('/:slug', getProductBySlug);

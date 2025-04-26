@@ -1,6 +1,7 @@
 const { default: mongoose } = require('mongoose');
 const Product = require('../models/product');
 const Category = require('../models/category');
+const Sub = require('../models/subCategory');
 const Tag = require('../models/tag');
 const Brand = require('../models/brand');
 
@@ -87,6 +88,7 @@ const getMinMaxPrice = async (req, res) => {
 const filterByCategory = async (req, res) => {
     try {
         let { categoryName } = req.query;
+        // console.log("Category slug from frontend----->", categoryName);
 
 
         if (!categoryName || categoryName.length === 0) {
@@ -97,9 +99,10 @@ const filterByCategory = async (req, res) => {
         categoryName = Array.isArray(categoryName)
             ? categoryName.map((name) => name.trim().toLowerCase())
             : categoryName.split(',').map((name) => name.trim().toLowerCase());
+        // console.log("Normalized category names----->", categoryName);
 
         const categories = await Category.find({
-            name: { $in: categoryName.map(name => new RegExp(`^${name}$`, 'i')) },
+            slug: { $in: categoryName.map(name => new RegExp(`^${name}$`, 'i')) },
         });
 
         if (categories.length === 0) {
@@ -108,6 +111,7 @@ const filterByCategory = async (req, res) => {
 
         // Extract the category IDs
         const categoryIds = categories.map((category) => category._id);
+        // console.log("Category IDs found----->", categoryIds);
 
         // Fetch products matching the category IDs
         const products = await Product.find({
@@ -118,7 +122,7 @@ const filterByCategory = async (req, res) => {
             .populate('brand', 'name')
             .sort([['createdAt', 'desc']]);
 
-        // console.log("Products found by category------>", products);
+        console.log(`Products found by ${categoryName}------>`, products.length);
 
         res.status(200).json({
             success: true,
@@ -128,6 +132,70 @@ const filterByCategory = async (req, res) => {
     } catch (error) {
         console.error("Error in filtering by category:", error);
         res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+const filterBySubCategory = async (req, res) => {
+    try {
+        let { subCategoryName } = req.query;
+
+        if (!subCategoryName || subCategoryName.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'At least one subcategory name is required.'
+            });
+        }
+
+        // Convert to array if it's a string
+        const subCategoryNames = Array.isArray(subCategoryName)
+            ? subCategoryName.map(name => name.trim())
+            : subCategoryName.split(',').map(name => name.trim());
+
+        // Find subcategories with case-insensitive matching
+        const subCategories = await Sub.find({
+            $or: [
+                { name: { $in: subCategoryNames } },
+                { slug: { $in: subCategoryNames } }
+            ]
+        });
+
+        if (!subCategories || subCategories.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No matching subcategories found.'
+            });
+        }
+
+        // Extract the subcategory IDs
+        const subcategoryIds = subCategories.map(sub => sub._id);
+
+        // Fetch products matching the subcategory IDs
+        const products = await Product.find({
+            subCategory: { $in: subcategoryIds }
+        })
+            .populate('category', 'name')
+            .populate('subCategory', 'name slug')
+            .populate('tags', 'name')
+            .populate('brand', 'name')
+            .sort([['createdAt', 'desc']]);
+
+        res.status(200).json({
+            success: true,
+            message: 'Products filtered by subcategories.',
+            products,
+            subCategories: subCategories.map(sub => ({
+                _id: sub._id,
+                name: sub.name,
+                slug: sub.slug
+            }))
+        });
+    } catch (error) {
+        console.error("Error in filtering by subcategory:", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+            error: error.message
+        });
     }
 };
 
@@ -242,6 +310,7 @@ module.exports = {
     liveSearch,
     sortByPrice,
     filterByCategory,
+    filterBySubCategory,
     filterByRating,
     filterProductsbyBrands,
     filterByPriceRange,

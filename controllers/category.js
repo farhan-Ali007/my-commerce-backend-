@@ -16,7 +16,7 @@ const createCategory = async (req, res) => {
 
 
         if (!file)
-            return res.status(400).json({ message: "Categiry image is required." })
+            return res.status(400).json({ message: "Category image is required." })
 
         let imageUrl;
 
@@ -49,7 +49,9 @@ const createCategory = async (req, res) => {
 const getAllCategories = async (req, res) => {
     try {
         // Fetch all categories
-        const categories = await Category.find({}).select("name slug Image menu");
+        const categories = await Category.find({})
+        .select("name slug Image menu")
+        .sort({ createdAt: -1 });
 
         // For each category, populate its subcategories
         const categoriesWithSubcategories = await Promise.all(
