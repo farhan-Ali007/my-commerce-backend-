@@ -24,7 +24,8 @@ const creatOrder = async (req, res) => {
 
         // Validate stock before proceeding
         for (const item of cartSummary) {
-            const product = await Product.findById(item.product);
+            console.log("Checking stock for product:", item.productId);
+            const product = await Product.findById(item.productId);
             if (!product) {
                 return res.status(404).json({ error: `Product not found: ${item.product}` });
             }
@@ -36,7 +37,7 @@ const creatOrder = async (req, res) => {
         // Update product stock and sold count using bulkWrite
         const bulkOperations = cartSummary.map((item) => ({
             updateOne: {
-                filter: { _id: item.product },
+                filter: { _id: item.productId },
                 update: {
                     $inc: {
                         stock: -item.count,

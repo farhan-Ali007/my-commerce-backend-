@@ -124,9 +124,10 @@ const productSchema = new mongoose.Schema({
 
 // **Pre-save Middleware**: Set delivery charges automatically
 productSchema.pre('save', function (next) {
-    this.deliveryCharges = this.freeShipping ? 200 : 0;
+    this.deliveryCharges = this.freeShipping ? 0 : 200;
     next();
 });
+
 
 
 productSchema.index({ title: 'text', description: 'text' });

@@ -33,21 +33,33 @@ const liveSearch = async (req, res) => {
 
 const sortByPrice = async (req, res) => {
     try {
-        const { sort } = req.query;
+        const { sort, page = 1, limit = 6 } = req.query;
+        console.log("coming query in sortByPrice function:", req.query)
 
         if (!sort || (sort !== 'asc' && sort !== 'desc')) {
             return res.status(400).json({ message: 'Invalid sort value. Use "asc" or "desc".' });
         }
 
+        const skip = (page - 1) * limit;
+        const totalProducts = await Product.countDocuments();
+        const totalPages = Math.ceil(totalProducts / limit);
+
         const products = await Product.find({})
             .populate('category', 'name')
             .populate('tags', 'name')
             .populate('brand', 'name')
-            .sort({ price: sort === 'asc' ? 1 : -1 });
+            .sort({ price: sort === 'asc' ? 1 : -1 })
+            .skip(skip)
+            .limit(limit);
 
+        console.log("Products sorted by price:", products.length);
+        console.log("total pages ------->", totalPages);
         res.status(200).json({
             success: true,
             message: 'Products sorted by price.',
+            currentPage: Number(page),
+            totalPages,
+            totalProducts,
             products
         });
     } catch (error) {
@@ -57,6 +69,7 @@ const sortByPrice = async (req, res) => {
 };
 
 const getMinMaxPrice = async (req, res) => {
+
     try {
         console.log("Inside getMinMaxPrice function👍👍👍👍👍👍");
         const minMax = await Product.aggregate([
@@ -87,19 +100,16 @@ const getMinMaxPrice = async (req, res) => {
 
 const filterByCategory = async (req, res) => {
     try {
-        let { categoryName } = req.query;
-        // console.log("Category slug from frontend----->", categoryName);
-
+        let { categoryName, page = 1, limit = 6 } = req.query;
+        console.log("Category name in filterByCategory function:", categoryName);
 
         if (!categoryName || categoryName.length === 0) {
             return res.status(400).json({ message: 'At least one category name is required.' });
         }
 
-        // Normalize category names from the query (trim and lowercase)
         categoryName = Array.isArray(categoryName)
             ? categoryName.map((name) => name.trim().toLowerCase())
             : categoryName.split(',').map((name) => name.trim().toLowerCase());
-        // console.log("Normalized category names----->", categoryName);
 
         const categories = await Category.find({
             slug: { $in: categoryName.map(name => new RegExp(`^${name}$`, 'i')) },
@@ -109,24 +119,26 @@ const filterByCategory = async (req, res) => {
             return res.status(404).json({ message: 'No matching categories found.' });
         }
 
-        // Extract the category IDs
         const categoryIds = categories.map((category) => category._id);
-        // console.log("Category IDs found----->", categoryIds);
+        const skip = (page - 1) * limit;
 
-        // Fetch products matching the category IDs
-        const products = await Product.find({
-            category: { $in: categoryIds }
-        })
+        const totalProducts = await Product.countDocuments({ category: { $in: categoryIds } });
+        const totalPages = Math.ceil(totalProducts / limit);
+
+        const products = await Product.find({ category: { $in: categoryIds } })
             .populate('category', 'name')
             .populate('tags', 'name')
             .populate('brand', 'name')
-            .sort([['createdAt', 'desc']]);
-
-        console.log(`Products found by ${categoryName}------>`, products.length);
+            .sort([['createdAt', 'desc']])
+            .skip(skip)
+            .limit(limit);
 
         res.status(200).json({
             success: true,
             message: 'Products filtered by categories.',
+            currentPage: Number(page),
+            totalPages,
+            totalProducts,
             products,
         });
     } catch (error) {
@@ -137,7 +149,7 @@ const filterByCategory = async (req, res) => {
 
 const filterBySubCategory = async (req, res) => {
     try {
-        let { subCategoryName } = req.query;
+        let { subCategoryName, page = 1, limit = 6 } = req.query;
 
         if (!subCategoryName || subCategoryName.length === 0) {
             return res.status(400).json({
@@ -146,12 +158,10 @@ const filterBySubCategory = async (req, res) => {
             });
         }
 
-        // Convert to array if it's a string
         const subCategoryNames = Array.isArray(subCategoryName)
             ? subCategoryName.map(name => name.trim())
             : subCategoryName.split(',').map(name => name.trim());
 
-        // Find subcategories with case-insensitive matching
         const subCategories = await Sub.find({
             $or: [
                 { name: { $in: subCategoryNames } },
@@ -166,22 +176,27 @@ const filterBySubCategory = async (req, res) => {
             });
         }
 
-        // Extract the subcategory IDs
         const subcategoryIds = subCategories.map(sub => sub._id);
+        const skip = (page - 1) * limit;
 
-        // Fetch products matching the subcategory IDs
-        const products = await Product.find({
-            subCategory: { $in: subcategoryIds }
-        })
+        const totalProducts = await Product.countDocuments({ subCategory: { $in: subcategoryIds } });
+        const totalPages = Math.ceil(totalProducts / limit);
+
+        const products = await Product.find({ subCategory: { $in: subcategoryIds } })
             .populate('category', 'name')
             .populate('subCategory', 'name slug')
             .populate('tags', 'name')
             .populate('brand', 'name')
-            .sort([['createdAt', 'desc']]);
+            .sort([['createdAt', 'desc']])
+            .skip(skip)
+            .limit(limit);
 
         res.status(200).json({
             success: true,
             message: 'Products filtered by subcategories.',
+            currentPage: Number(page),
+            totalPages,
+            totalProducts,
             products,
             subCategories: subCategories.map(sub => ({
                 _id: sub._id,
@@ -201,27 +216,29 @@ const filterBySubCategory = async (req, res) => {
 
 const filterByRating = async (req, res) => {
     try {
-        const { rating } = req.query;
-        console.log("coming rating from frontend---->", rating);
+        const { rating, page = 1, limit = 8 } = req.query;
 
         if (!rating || isNaN(rating) || rating < 1 || rating > 5) {
             return res.status(400).json({ message: 'Invalid rating value. Must be between 1 and 5.' });
         }
 
-        // Convert rating to a number
         const parsedRating = parseFloat(rating);
+        const skip = (page - 1) * limit;
 
-        // Use aggregation to filter products by the existing averageRating field
-        const products = await Product.find({
-            averageRating: { $gte: parsedRating } // Filter based on existing averageRating field
-        })
+        const totalProducts = await Product.countDocuments({ averageRating: { $gte: parsedRating } });
+        const totalPages = Math.ceil(totalProducts / limit);
+
+        const products = await Product.find({ averageRating: { $gte: parsedRating } })
             .sort({ averageRating: 1 })
-            .exec();
+            .skip(skip)
+            .limit(limit);
 
-        console.log("Products found----->", products);
         res.status(200).json({
             success: true,
             message: 'Products filtered by rating.',
+            currentPage: Number(page),
+            totalPages,
+            totalProducts,
             products
         });
     } catch (error) {
@@ -233,11 +250,17 @@ const filterByRating = async (req, res) => {
 const filterProductsbyBrands = async (req, res) => {
     try {
         const { brand } = req.params;
-        console.log("Brand name from frontend---->", brand);
+        const { page = 1, limit = 10 } = req.query;
+
         const brandData = await Brand.findOne({ name: brand });
         if (!brandData) {
             return res.status(404).json({ success: false, message: "Brand not found" });
         }
+
+        const skip = (page - 1) * limit;
+
+        const totalProducts = await Product.countDocuments({ brand: brandData._id });
+        const totalPages = Math.ceil(totalProducts / limit);
 
         const products = await Product.find({ brand: brandData._id })
             .populate('category', 'name')
@@ -251,27 +274,30 @@ const filterProductsbyBrands = async (req, res) => {
                     select: 'name email'
                 }
             })
-            .sort([['updatedAt', 'desc'], ['createdAt', 'desc']]);
+            .sort([['updatedAt', 'desc'], ['createdAt', 'desc']])
+            .skip(skip)
+            .limit(limit);
+
+        console.log("Products filtered by brand:", products.length);
 
         res.status(200).json({
             success: true,
             message: "Products fetched successfully",
+            currentPage: Number(page),
+            totalPages,
+            totalProducts,
             products
         });
     } catch (error) {
-        console.log("Error in fetching by brands", error);
+        console.error("Error in fetching by brands", error);
         res.status(500).json({ message: "Internal server error" });
     }
 };
 
 const filterByPriceRange = async (req, res) => {
     try {
-        let { minPrice, maxPrice } = req.query;
+        let { minPrice, maxPrice, page = 1, limit = 8 } = req.query;
 
-        console.log("minPrice---->", minPrice);
-        console.log("maxPrice---->", maxPrice);
-
-        // Convert to numbers and set default values if not provided
         minPrice = minPrice ? parseFloat(minPrice) : 0;
         maxPrice = maxPrice ? parseFloat(maxPrice) : Number.MAX_SAFE_INTEGER;
 
@@ -283,17 +309,29 @@ const filterByPriceRange = async (req, res) => {
             return res.status(400).json({ message: 'minPrice cannot be greater than maxPrice.' });
         }
 
+        const skip = (page - 1) * limit;
+
+        const totalProducts = await Product.countDocuments({
+            price: { $gte: minPrice, $lte: maxPrice }
+        });
+        const totalPages = Math.ceil(totalProducts / limit);
+
         const products = await Product.find({
             price: { $gte: minPrice, $lte: maxPrice }
         })
             .populate('category', 'name')
             .populate('tags', 'name')
             .populate('brand', 'name')
-            .sort({ price: 1 });
+            .sort({ price: 1 })
+            .skip(skip)
+            .limit(limit);
 
         res.status(200).json({
             success: true,
             message: 'Products filtered by price range.',
+            currentPage: Number(page),
+            totalPages,
+            totalProducts,
             products
         });
 
@@ -302,6 +340,7 @@ const filterByPriceRange = async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 };
+
 
 
 

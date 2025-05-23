@@ -75,7 +75,7 @@ const createProduct = async (req, res) => {
         const uploadedVariants = await processVariants(parsedVariants, req.files.variantImages);
 
         // **Handle Free Shipping & Delivery Charges**
-        const isFreeShipping = freeShipping === "true" || freeShipping === true;
+        const isFreeShipping = freeShipping === 'true' || freeShipping === true;
         const deliveryCharges = isFreeShipping ? 0 : 200;
         // Create product
         const currentUserId = req.user.id;
@@ -101,6 +101,7 @@ const createProduct = async (req, res) => {
         });
 
         await newProduct.save();
+        console.log("New product in db----->", newProduct)
 
         res.status(201).json({
             message: 'Product created successfully',
@@ -480,7 +481,7 @@ const getProductBySlug = async (req, res) => {
         console.log("Slug while getting product------>", slug)
 
         const product = await Product.findOne({ slug })
-            .populate('category', 'name')
+            .populate('category', 'name slug')
             .populate('subCategory', 'name')
             .populate('tags', 'name')
             .populate('brand', 'name')
@@ -632,30 +633,30 @@ const getBestSellers = async (req, res) => {
         const skip = (page - 1) * limit;
 
         const bestSellerTag = await Tag.findOne({ name: 'best seller' });
-        
+
         // Create aggregation pipeline
         const aggregationPipeline = [];
-        
+
         // First stage: Match products with best seller tag if exists
         if (bestSellerTag) {
             aggregationPipeline.push({
                 $match: { tags: { $in: [bestSellerTag._id] } }
             });
-            
+
             // Add a field to mark these as tagged best sellers
             aggregationPipeline.push({
                 $addFields: { isTaggedBestSeller: true }
             });
         }
-        
+
         // Second stage: Union with top selling products
         aggregationPipeline.push({
             $unionWith: {
                 coll: 'products',
                 pipeline: [
                     // Exclude already included tagged products if they exist
-                    bestSellerTag ? { 
-                        $match: { 
+                    bestSellerTag ? {
+                        $match: {
                             $and: [
                                 { tags: { $nin: [bestSellerTag._id] } },
                                 { sold: { $gt: 0 } }
@@ -667,20 +668,20 @@ const getBestSellers = async (req, res) => {
                 ]
             }
         });
-        
+
         // Sorting and limiting
         aggregationPipeline.push(
-            { 
-                $sort: { 
+            {
+                $sort: {
                     isTaggedBestSeller: -1, // Tagged products first
                     sold: -1,               // Then by sales
                     createdAt: -1           // Then by newest
-                } 
+                }
             },
             { $skip: skip },
             { $limit: Number(limit) }
         );
-        
+
         // Lookup for related data
         aggregationPipeline.push(
             {
@@ -732,22 +733,22 @@ const getBestSellers = async (req, res) => {
 
         // Execute aggregation
         const products = await Product.aggregate(aggregationPipeline);
-        
+
         // Count total best sellers (both tagged and top selling)
         const countPipeline = [];
-        
+
         if (bestSellerTag) {
             countPipeline.push({
                 $match: { tags: { $in: [bestSellerTag._id] } }
             });
         }
-        
+
         countPipeline.push({
             $unionWith: {
                 coll: 'products',
                 pipeline: [
-                    bestSellerTag ? { 
-                        $match: { 
+                    bestSellerTag ? {
+                        $match: {
                             $and: [
                                 { tags: { $nin: [bestSellerTag._id] } },
                                 { sold: { $gt: 0 } }
@@ -757,17 +758,17 @@ const getBestSellers = async (req, res) => {
                 ]
             }
         });
-        
+
         countPipeline.push({ $count: 'total' });
-        
+
         const countResult = await Product.aggregate(countPipeline);
         const totalProducts = countResult[0]?.total || 0;
         const totalPages = Math.ceil(totalProducts / limit);
 
         res.status(200).json({
             success: true,
-            message: bestSellerTag 
-                ? 'Best-seller tagged and top selling products fetched successfully' 
+            message: bestSellerTag
+                ? 'Best-seller tagged and top selling products fetched successfully'
                 : 'Top selling products fetched successfully',
             currentPage: Number(page),
             totalPages,
@@ -783,11 +784,18 @@ const getBestSellers = async (req, res) => {
 const getProductsBySubCategory = async (req, res) => {
     try {
         const { subCategory } = req.params;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
 
+        console.log("coming query params in subcategory controller------->", req.query)
         const subCategoryDoc = await SubCategory.findOne({ slug: subCategory });
         if (!subCategoryDoc) {
             return res.status(404).json({ message: "Subcategory not found." });
         }
+
+        const totalProducts = await Product.countDocuments({ subCategory: subCategoryDoc._id });
+        const totalPages = Math.ceil(totalProducts / limit);
 
         const products = await Product.find({ subCategory: subCategoryDoc._id })
             .populate('category', 'name')
@@ -801,13 +809,17 @@ const getProductsBySubCategory = async (req, res) => {
                     select: 'name email'
                 }
             })
-            .sort([['updatedAt', 'desc'], ['createdAt', 'desc']]);
+            .sort([['updatedAt', 'desc'], ['createdAt', 'desc']])
+            .skip(skip)
+            .limit(limit);
 
-        // console.log("Products found by sub------>", products)
         res.status(200).json({
             success: true,
             message: 'Products fetched successfully',
-            products
+            products,
+            totalProducts,
+            totalPages,
+            currentPage: page
         });
     } catch (error) {
         console.error("Error in fetching products by subcategory", error);
