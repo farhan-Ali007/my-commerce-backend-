@@ -1,0 +1,24 @@
+name: Auto Deploy via FTP
+
+on:
+  push:
+    branches: [ main ]    # or 'master' if that's your default
+
+jobs:
+  ftp-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASS }}
+          port: 21
+          protocol: ftp        # you can also try 'ftps' for explicit FTPS
+          local-dir: ./        # or your build folder if you have one
+          server-dir: public_html/my.etimadmart.com
