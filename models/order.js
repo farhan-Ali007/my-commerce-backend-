@@ -27,6 +27,8 @@ const orderSchema = new mongoose.Schema({
     cartSummary: [
         {
             product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+            title: { type: String },
+            image: { type: String },
             count: { type: Number, required: true },
             price: { type: Number, required: true },
             selectedVariants: [{ type: mongoose.Schema.Types.Mixed }]

@@ -78,7 +78,7 @@ const getAllCategories = async (req, res) => {
 const deleteCategory = async (req, res) => {
     try {
         const { id } = req.params;
-        console.log("Category being deleting----->", id)
+        console.log("Category id being deleting----->", id)
 
         const category = await Category.findById(id)
 

@@ -1,5 +1,5 @@
 const User = require('../models/user')
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const generateTokenAndSetCookies = require('../utils/generateToken');
 const { uploadImage } = require('../config/cloudinary.js');
 

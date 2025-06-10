@@ -55,6 +55,11 @@ const createProduct = async (req, res) => {
             return res.status(400).json({ message: "Tags are required." });
         }
 
+        // Add 'new' tag to new products
+        if (!tagsArray.includes('new')) {
+            tagsArray.push('new');
+        }
+
         // Validate category and subcategory
         const categoryDoc = await validateCategory(category);
         const subCategoryDoc = await validateSubCategory(subCategory);
@@ -894,23 +899,21 @@ const getNewArrivals = async (req, res) => {
         const skip = (page - 1) * limit;
 
         // First find the new tag
-        const newTag = await Tag.findOne({ name: 'new' });
+        let newTag = await Tag.findOne({ name: 'new' });
         if (!newTag) {
-            return res.status(200).json({
-                success: true,
-                message: 'No new arrivals tag found',
-                products: [],
-                currentPage: 1,
-                totalPages: 0,
-                totalProducts: 0
-            });
+            // Create the new tag if it doesn't exist
+            newTag = new Tag({ name: 'new' });
+            await newTag.save();
         }
 
         // Count total new arrival products
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
         const totalProducts = await Product.countDocuments({
-            $and: [
+            $or: [
                 { tags: { $in: [newTag._id] } },
-                { createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } // Last 30 days
+                { createdAt: { $gte: thirtyDaysAgo } }
             ]
         });
 
@@ -918,9 +921,9 @@ const getNewArrivals = async (req, res) => {
 
         // Get new arrival products with pagination
         const products = await Product.find({
-            $and: [
+            $or: [
                 { tags: { $in: [newTag._id] } },
-                { createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } // Last 30 days
+                { createdAt: { $gte: thirtyDaysAgo } }
             ]
         })
             .populate('category', 'name')
@@ -938,6 +941,7 @@ const getNewArrivals = async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(limit);
 
+        // Calculate average rating for each product
         products.forEach(product => {
             const totalRating = product.reviews.reduce((acc, review) => acc + review.rating, 0);
             product.averageRating = product.reviews.length > 0 ?
