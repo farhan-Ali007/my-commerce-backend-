@@ -21,4 +21,4 @@ jobs:
           port: 21
           protocol: ftp        # you can also try 'ftps' for explicit FTPS
           local-dir: ./        # or your build folder if you have one
-          server-dir: public_html/my.etimadmart.com
+          server-dir: public_html/my.etimadmart.com/
