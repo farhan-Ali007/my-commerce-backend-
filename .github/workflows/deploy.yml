@@ -2,7 +2,7 @@ name: Auto Deploy via FTP
 
 on:
   push:
-    branches: [ main ]    # or 'master' if that's your default
+    branches: [ dev ]    # or 'master' if that's your default
 
 jobs:
   ftp-deploy:
