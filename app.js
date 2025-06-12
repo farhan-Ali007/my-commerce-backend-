@@ -4,7 +4,7 @@ const dotenv = require('dotenv')
 const bodyParser = require('body-parser')
 const cookieParser = require('cookie-parser')
 const helmet = require('helmet')
-const rateLimit = require('express-rate-limit')
+// const rateLimit = require('express-rate-limit') // Removed
 const mongoSanitize = require('express-mongo-sanitize')
 const xss = require('xss-clean')
 const { connectDB } = require('./db/connectDb')
@@ -24,20 +24,32 @@ dotenv.config()
 const app = express();
 
 // Security Middleware
-app.use(helmet())
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      connectSrc: ["'self'", "https://res.cloudinary.com"],
+      objectSrc: ["'none'"]
+    }
+  }
+}));
+
 app.use(mongoSanitize())
 app.use(xss())
 
 // Rate limiting
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100 // limit each IP to 100 requests per windowMs
-});
-app.use('/api/', limiter);
+// const limiter = rateLimit({
+//     windowMs: 15 * 60 * 1000, // 15 minutes
+//     max: 500 // limit each IP to 500 requests per windowMs
+// });
+// app.use('/api/', limiter);
 
 // CORS configuration
 app.use(cors({
-    origin: ['http://localhost:5173', 'https://etimad.netlify.app'],
+    origin: ['http://localhost:5173', 'https://my.etimadmart.com'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization']
