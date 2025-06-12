@@ -96,7 +96,11 @@ app.get('/health', (req, res) => {
 // Connect to database
 connectDB();
 
-const port = process.env.PORT || 3600;
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`)
-})
+// Use cPanel's provided port or fallback to 3000
+const port = process.env.PORT || 3000;
+const host = process.env.HOST || '0.0.0.0';
+// Start server
+app.listen(port, host, () => {
+    console.log(`Server running at http://${host}:${port}`);
+    console.log(`Node.js version: ${process.version}`);
+});
