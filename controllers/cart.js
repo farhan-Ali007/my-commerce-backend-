@@ -102,6 +102,8 @@ const getCart = async (req, res) => {
             return res.status(404).json({ message: 'Cart not found' });
         }
 
+        console.log("My cart---------->" , cart)
+
         res.status(200).json({
             ...cart.toObject(),
             isGuest: !cart.orderedBy
@@ -117,26 +119,19 @@ const clearCart = async (req, res) => {
     const guestId = req.cookies?.guestId;
 
     try {
-        let cart;
-        // Try to find and delete cart by userId first
+        let deleted = false;
         if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-            cart = await Cart.findOneAndDelete({ orderedBy: userId });
+            const result = await Cart.deleteMany({ orderedBy: userId });
+            if (result.deletedCount > 0) deleted = true;
         }
-
-        // If no cart found with userId, try guestId
-        if (!cart && guestId) {
-            cart = await Cart.findOneAndDelete({ guestId });
+        if (guestId) {
+            const result = await Cart.deleteMany({ guestId });
+            if (result.deletedCount > 0) deleted = true;
         }
-
-        if (!cart) {
+        if (!deleted) {
             return res.status(404).json({ message: 'Cart not found' });
         }
-
-        // If it was a guest cart, clear the cookie
-        // if (cart.guestId) {
-        //     res.clearCookie('guestId');
-        // }
-
+        console.log('Cart(s) cleared for userId:', userId, 'guestId:', guestId);
         res.status(200).json({ message: 'Cart cleared' });
     } catch (error) {
         res.status(500).json({ message: 'Error clearing cart', error });

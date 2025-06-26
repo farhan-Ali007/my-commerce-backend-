@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const slugify = require('slugify');
 
 const variantValueSchema = new mongoose.Schema({
     value: {
@@ -29,7 +30,6 @@ const productSchema = new mongoose.Schema({
     slug: {
         type: String,
         unique: true,
-        required: true,
     },
     description: {
         type: String,
@@ -40,6 +40,11 @@ const productSchema = new mongoose.Schema({
         type: String,
         required: true,
         trim: true,
+    },
+    metaDescription: {
+        type: String,
+        trim: true,
+        default: ""
     },
     price: {
         type: Number,
@@ -124,11 +129,13 @@ const productSchema = new mongoose.Schema({
 
 // **Pre-save Middleware**: Set delivery charges automatically
 productSchema.pre('save', function (next) {
+    // Generate slug if it's a new product or title is modified and slug is not set
+    if (!this.slug) {
+        this.slug = slugify(this.title, { lower: true, strict: true });
+    }
     this.deliveryCharges = this.freeShipping ? 0 : 200;
     next();
 });
-
-
 
 productSchema.index({ title: 'text', description: 'text' });
 

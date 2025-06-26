@@ -8,17 +8,20 @@ const Brand = require('../models/brand');
 const liveSearch = async (req, res) => {
     try {
         const { query } = req.query;
+        const limit = parseInt(req.query.limit) || 10; 
 
         if (!query) {
             return res.status(400).json({ message: 'Search query is required.' });
         }
 
-        const products = await Product.find({
-            $text: { $search: query }
-        })
+        const products = await Product.find(
+            { $text: { $search: query } },
+            { score: { $meta: "textScore" } } 
+        )
             .populate('category', 'title images category')
             .populate('tags', 'title')
-            .sort([['createdAt', 'desc']]);
+            .sort({ score: { $meta: "textScore" } }) 
+            .limit(limit);
 
         res.status(200).json({
             success: true,

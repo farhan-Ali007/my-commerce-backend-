@@ -8,6 +8,17 @@ const { default: mongoose } = require('mongoose');
 const slugify = require('slugify');
 const SubCategory = require('../models/subCategory.js');
 
+const generateSlug = (title, providedSlug) => {
+    if (providedSlug !== undefined && providedSlug !== null && providedSlug !== "") {
+        const decoded = decodeURIComponent(String(providedSlug));
+        return slugify(decoded, { lower: true, strict: true });
+    } else if (providedSlug === "") {
+        return null;
+    } else {
+        return slugify(String(title), { lower: true, strict: true });
+    }
+};
+
 const createProduct = async (req, res) => {
     try {
         const {
@@ -24,20 +35,17 @@ const createProduct = async (req, res) => {
             variants,
             freeShipping,
             tags,
+            slug,
+            imageAlts,
+            metaDescription
         } = req.body;
 
         console.log("Coming data----->", req.body)
+        console.log("Raw slug from req.body (createProduct):", slug);
 
         // Validate required fields
         if (!title || !description || !price || !category || !stock || !req.files.images) {
             return res.status(400).json({ message: "All fields are required" });
-        }
-
-        // Generate slug
-        let slug = slugify(title, { lower: true, strict: true });
-        let existingProduct = await Product.findOne({ slug });
-        if (existingProduct) {
-            slug = `${slug}-${Date.now()}`;
         }
 
         // Parse and validate variants
@@ -88,8 +96,9 @@ const createProduct = async (req, res) => {
             title,
             description,
             longDescription,
+            metaDescription,
             price,
-            slug,
+            slug: generateSlug(title, slug),
             salePrice,
             weight,
             category: categoryDoc._id,
@@ -104,6 +113,8 @@ const createProduct = async (req, res) => {
             deliveryCharges,
             creator: currentUserId,
         });
+
+        console.log("Final slug after slugify (createProduct):", newProduct.slug);
 
         await newProduct.save();
         console.log("New product in db----->", newProduct)
@@ -209,7 +220,7 @@ const processVariants = async (variants, variantImages) => {
 
 const updateProduct = async (req, res) => {
     try {
-        const { slug } = req.params;
+        const { slug: paramSlug } = req.params;
         const {
             title,
             description,
@@ -223,21 +234,22 @@ const updateProduct = async (req, res) => {
             brand,
             variants,
             tags,
-            existingImages
+            existingImages,
+            slug,
+            metaDescription
         } = req.body;
 
         // console.log("coming slug in update controller ------>", slug);
         console.log("Coming data in update controller from frontend------>", req.body)
+        console.log("Raw slug from req.body (updateProduct):", slug);
         console.log("subCategory field in request body:", req.body.subCategory);
         // console.log("coming variants in update controller from frontend ------->", variants)
         // console.log("coming category typeof in update controller from frontend ------->", typeof category)
         // console.log("coming subcategory in update controller from frontend ------->", subCategory)
         // console.log("coming images in update controller from frontend ----------->", req.files);
 
-        const product = await Product.findOne({ slug });
+        const product = await Product.findOne({ slug: paramSlug });
         if (!product) return res.status(404).json({ message: "Product not found." });
-        if (product.creator.toString() !== req.user.id)
-            return res.status(403).json({ message: "You are not authorized to update this product." });
 
         const parsedVariants = variants ? JSON.parse(variants) : null;
 
@@ -245,18 +257,18 @@ const updateProduct = async (req, res) => {
             product.title = title;
         }
 
+        // Handle optional slug update
+        if (slug !== undefined) {
+            const newSlug = generateSlug(title, slug); // Pass title for fallback in case of empty slug
+            product.slug = newSlug;
+            console.log("Final slug after slugify (updateProduct):", product.slug);
+        }
+
         let tagIds = [];
         if (tags) {
             const tagsArray = Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim());
-            for (const tagName of tagsArray) {
-                const tagNameLower = tagName.toLowerCase();
-                let tag = await Tag.findOne({ name: tagNameLower });
-                if (!tag) {
-                    tag = new Tag({ name: tagNameLower });
-                    await tag.save();
-                }
-                if (!tagIds.includes(tag._id)) tagIds.push(tag._id);
-            }
+            tagIds = await processTags(tagsArray);
+            product.tags = tagIds;
         }
 
         let categoryId = product.category;
@@ -406,6 +418,12 @@ const updateProduct = async (req, res) => {
             });
         }
 
+        // Handle Free Shipping & Delivery Charges
+        if (req.body.freeShipping !== undefined) {
+            const isFreeShipping = req.body.freeShipping === 'true' || req.body.freeShipping === true;
+            product.freeShipping = isFreeShipping;
+            product.deliveryCharges = isFreeShipping ? 0 : 200;
+        }
 
         product.title = title || product.title;
         product.description = description || product.description;
@@ -420,6 +438,7 @@ const updateProduct = async (req, res) => {
         product.tags = tagIds.length > 0 ? tagIds : product.tags;
         product.images = updatedImages;
         product.variants = updatedVariants;
+        product.metaDescription = metaDescription || product.metaDescription;
 
         await product.save();
 
@@ -531,9 +550,6 @@ const deleteProduct = async (req, res) => {
         const product = await Product.findById(id)
         if (!product)
             return res.status(404).json({ message: "Invalid product Id" })
-
-        if (product.creator?.toString() !== req.user.id)
-            return res.status(403).json({ message: "You are not authorized to delete this product." });
 
         if (product.images && product.images.length > 0) {
             for (const imageUrl of product.images) {

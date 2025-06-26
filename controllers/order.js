@@ -16,7 +16,7 @@ const creatOrder = async (req, res) => {
             console.log("userId---->", userId);
             if (!req.cookies?.guestId) {
                 res.cookie('guestId', userId, {
-                    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+                    maxAge: 30 * 24 * 60 * 60 * 1000, 
                     httpOnly: true,
                 });
             }
@@ -100,7 +100,8 @@ const getMyOrders = async (req, res) => {
         }
 
         if (query.length === 0) {
-            return res.status(400).json({ error: "User ID or Guest ID is required" });
+            // If no user ID or guest ID, return an empty array with 200 OK
+            return res.status(200).json({ orders: [] });
         }
 
         const orders = await Order.find({
@@ -135,13 +136,25 @@ const updateOrderStatus = async (req, res) => {
 
 const getAllOrders = async (req, res) => {
     try {
-        const orders = await Order.find({})
-            .populate('cartSummary.product', 'title price')
-            .populate('orderedBy', 'username email')
-            .sort({ orderedAt: -1 })
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const [orders, total] = await Promise.all([
+            Order.find({})
+                .populate('cartSummary.product', 'title price')
+                .populate('orderedBy', 'username email')
+                .sort({ orderedAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            Order.countDocuments()
+        ]);
         res.status(200).json({
             success: true,
-            orders
+            orders,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit)
         });
     } catch (error) {
         console.log("Error in getting all orders:", error);

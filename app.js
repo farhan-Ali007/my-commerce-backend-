@@ -4,9 +4,9 @@ const dotenv = require('dotenv')
 const bodyParser = require('body-parser')
 const cookieParser = require('cookie-parser')
 const helmet = require('helmet')
-// const rateLimit = require('express-rate-limit') // Removed
 const mongoSanitize = require('express-mongo-sanitize')
 const xss = require('xss-clean')
+const path = require('path')
 const { connectDB } = require('./db/connectDb')
 const userRouter = require('./routes/user.js')
 const productRouter = require('./routes/product.js')
@@ -19,6 +19,8 @@ const orderRouter = require('./routes/order.js')
 const searchRouter = require('./routes/search.js')
 const bannerRouter = require('./routes/banner.js')
 const brandRouter = require('./routes/brand.js')
+const sitemapRoute = require('./routes/sitemap')
+const dynamicPageRouter = require('./routes/dynamicPage')
 
 dotenv.config()
 const app = express();
@@ -28,7 +30,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
+      imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       connectSrc: ["'self'", "https://res.cloudinary.com"],
@@ -40,16 +42,10 @@ app.use(helmet({
 app.use(mongoSanitize())
 app.use(xss())
 
-// Rate limiting
-// const limiter = rateLimit({
-//     windowMs: 15 * 60 * 1000, // 15 minutes
-//     max: 500 // limit each IP to 500 requests per windowMs
-// });
-// app.use('/api/', limiter);
 
 // CORS configuration
 app.use(cors({
-    origin: ['http://localhost:5173', 'https://my.etimadmart.com','https://etimadmart.netlify.app'],
+    origin: ['http://localhost:5173', 'https://etimadmart.com','https://etimadmart.netlify.app'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -87,6 +83,16 @@ app.use('/api/v1/search', searchRouter)
 app.use('/api/v1/sub', subCategoryRouter)
 app.use('/api/v1/banner', bannerRouter)
 app.use('/api/v1/brand', brandRouter)
+app.use('/', sitemapRoute)
+app.use('/api/v1/page', dynamicPageRouter)
+
+// Serve frontend static files
+app.use(express.static(path.join(__dirname, '../frontend/dist')))
+
+// Catch-all route to serve frontend's index.html for client-side routing
+app.get('*', (req, res) => {
+    res.sendFile(path.resolve(__dirname, '../frontend/dist', 'index.html'));
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -97,7 +103,7 @@ app.get('/health', (req, res) => {
 connectDB();
 
 // Use cPanel's provided port or fallback to 3000
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3600;
 const host = process.env.HOST || '0.0.0.0';
 // Start server
 app.listen(port, host, () => {
