@@ -12,7 +12,7 @@ const generateTokenAndSetCookies = (res, userId) => {
             httpOnly: true,
             sameSite: 'None',
             secure: true,
-            maxAge: 604800000
+            maxAge: 86400000
         })
         return token;
     } catch (error) {
