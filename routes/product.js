@@ -30,10 +30,10 @@ router.get('/new-arrivals', getNewArrivals)
 
 // 🟢 Dynamic routes should come LAST
 router.get('/:slug', getProductBySlug);
-router.put('/:slug', isAuthorized, isAdmin, upload.fields([{ name: 'images', maxCount: 10 }, { name: 'variantImages', maxCount: 10 }]), updateProduct)
+router.put('/:slug', isAuthorized, isAdmin, upload.fields([{ name: 'images', maxCount: 30 }, { name: 'variantImages', maxCount: 500 }]), updateProduct)
 router.delete('/:id', isAuthorized, isAdmin, deleteProduct)
 
 // 🟢 Post routes
-router.post('/create', isAuthorized, isAdmin, upload.fields([{ name: 'images', maxCount: 10 }, { name: 'variantImages', maxCount: 10 }]), createProduct);
+router.post('/create', isAuthorized, isAdmin, upload.fields([{ name: 'images', maxCount: 30 }, { name: 'variantImages', maxCount: 500 }]), createProduct);
 
 module.exports = router;

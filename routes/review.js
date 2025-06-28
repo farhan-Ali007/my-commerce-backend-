@@ -3,9 +3,10 @@ const { createReview, getAllReviews,  getReviewsBySlug } = require('../controlle
 const express = require('express')
 const router = express.Router()
 const { isAuthorized } = require('../middlewares/auth')
+const multer = require('multer');
+const upload = multer({ dest: "uploads/" });
 
-
-router.post('/create/:productSlug/:reviewerId', isAuthorized, createReview)
+router.post('/create/:productSlug/:reviewerId', isAuthorized, upload.array('images', 5), createReview)
 router.get('/all', getAllReviews)
 router.get('/:slug', getReviewsBySlug)
 

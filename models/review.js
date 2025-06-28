@@ -24,7 +24,11 @@ const reviewSchema = new mongoose.Schema({
         required: true,
         min: 1,
         max: 5
-    }
+    },
+    images: [{
+        type: String, // Cloudinary URLs
+        default: ""
+    }]
 }, { timestamps: true });
 
 const Review = mongoose.model('Review', reviewSchema);

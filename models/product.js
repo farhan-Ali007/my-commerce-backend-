@@ -62,6 +62,20 @@ const productSchema = new mongoose.Schema({
             message: 'Sale price must be less than or equal to the original price.',
         },
     },
+    specialOfferEnabled: {
+        type: Boolean,
+        default: false,
+    },
+    specialOfferPrice: {
+        type: Number,
+        min: 0,
+    },
+    specialOfferStart: {
+        type: Date,
+    },
+    specialOfferEnd: {
+        type: Date,
+    },
     weight: {
         type: String,
         trim: true,

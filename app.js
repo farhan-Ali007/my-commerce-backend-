@@ -26,17 +26,27 @@ dotenv.config()
 const app = express();
 
 // Security Middleware
+// TEMPORARY: Comment out helmet to disable CSP for testing
+// app.use(helmet({
+//   contentSecurityPolicy: {
+//     directives: {
+//       defaultSrc: ["'self'"],
+//       imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com", "https:"],
+//       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://www.googletagmanager.com", "https://www.google-analytics.com"],
+//       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+//       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+//       connectSrc: ["'self'", "https://res.cloudinary.com", "https://etimadmart.com", "https://www.google-analytics.com"],
+//       frameSrc: ["'self'"],
+//       objectSrc: ["'none'"],
+//       baseUri: ["'self'"],
+//       formAction: ["'self'"]
+//     }
+//   }
+// }));
+
+// Use basic helmet without CSP for testing
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      connectSrc: ["'self'", "https://res.cloudinary.com"],
-      objectSrc: ["'none'"]
-    }
-  }
+  contentSecurityPolicy: false
 }));
 
 app.use(mongoSanitize())

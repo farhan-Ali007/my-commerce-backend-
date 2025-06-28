@@ -1,18 +1,27 @@
-
 const Product = require('../models/product');
 const Review = require('../models/review')
+const { uploadImage } = require('../config/cloudinary');
 
 const createReview = async (req, res) => {
     try {
         const { productSlug, reviewerId } = req.params;
         const { email, reviewText, rating } = req.body;
+        let imageUrls = [];
+
+        // Handle multiple image uploads
+        if (req.files && req.files.length > 0) {
+            for (const file of req.files) {
+                const uploaded = await uploadImage(file, "review");
+                imageUrls.push(uploaded.url);
+            }
+        }
 
         if (!email) return res.status(400).json({ message: "Email required" });
         if (!reviewText) return res.status(400).json({ message: "ReviewText required" });
         if (!rating) return res.status(400).json({ message: "rating required" });
         if (rating < 1) return res.status(400).json({ message: "Rating must be at least 1" });
 
-        const newReview = new Review({ productSlug, reviewerId, email, reviewText, rating });
+        const newReview = new Review({ productSlug, reviewerId, email, reviewText, rating, images: imageUrls });
         await newReview.save();
 
         const product = await Product.findOne({ slug: productSlug });

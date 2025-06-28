@@ -236,17 +236,18 @@ const updateProduct = async (req, res) => {
             tags,
             existingImages,
             slug,
-            metaDescription
+            metaDescription,
+            specialOfferEnabled,
+            specialOfferPrice,
+            specialOfferStart,
+            specialOfferEnd,
         } = req.body;
 
-        // console.log("coming slug in update controller ------>", slug);
+        console.log("category from frontend:", category, "subCategory from frontend:", subCategory);
         console.log("Coming data in update controller from frontend------>", req.body)
         console.log("Raw slug from req.body (updateProduct):", slug);
         console.log("subCategory field in request body:", req.body.subCategory);
-        // console.log("coming variants in update controller from frontend ------->", variants)
-        // console.log("coming category typeof in update controller from frontend ------->", typeof category)
-        // console.log("coming subcategory in update controller from frontend ------->", subCategory)
-        // console.log("coming images in update controller from frontend ----------->", req.files);
+        console.log("variantImages received:", req.files?.variantImages);
 
         const product = await Product.findOne({ slug: paramSlug });
         if (!product) return res.status(404).json({ message: "Product not found." });
@@ -271,25 +272,19 @@ const updateProduct = async (req, res) => {
             product.tags = tagIds;
         }
 
-        let categoryId = product.category;
-        // console.log("Category id before update------->", typeof categoryId)
-
-        if (category) {
+        // CATEGORY
+        if (category && category !== "") {
             if (mongoose.Types.ObjectId.isValid(category)) {
-                const categoryObjectId = new mongoose.Types.ObjectId(category); // Convert string to ObjectId
-                console.log("Category ObjectId to be queried:", categoryObjectId);
-
-                const categoryExists = await Category.findById(categoryObjectId);
-                console.log("Category Query Result:", categoryExists);
-
-                if (!categoryExists) {
+                const categoryObj = await Category.findById(category);
+                if (!categoryObj) {
                     return res.status(404).json({ message: `Category not found for ID: ${category}` });
                 }
-                product.category = categoryObjectId; // Assign as ObjectId
+                product.category = categoryObj._id;
             } else {
                 return res.status(400).json({ message: "Invalid category ID format." });
             }
         }
+
         // Handle brand
         let brandId = product.brand;
         if (brand) {
@@ -311,49 +306,17 @@ const updateProduct = async (req, res) => {
             }
         }
 
-        let subCategoryId = product.subCategory;
-        console.log("Subcategory id before update------->", subCategoryId);
-
-        if (subCategory) {
-            let subCategoryData;
-            try {
-                subCategoryData = typeof subCategory === 'string' ? JSON.parse(subCategory) : subCategory;
-            } catch (error) {
-                subCategoryData = subCategory;
-            }
-
-            if (typeof subCategoryData === 'object' && subCategoryData._id) {
-                // Verify the subcategory exists in DB
-                const subCategoryObj = await SubCategory.findById(subCategoryData._id);
+        // SUBCATEGORY
+        if (subCategory && subCategory !== "") {
+            if (mongoose.Types.ObjectId.isValid(subCategory)) {
+                const subCategoryObj = await SubCategory.findById(subCategory);
                 if (!subCategoryObj) {
-                    return res.status(400).json({ message: "SubCategory not found." });
+                    return res.status(400).json({ message: "SubCategory not found for ID: " + subCategory });
                 }
-                subCategoryId = subCategoryData._id;
-            } else if (typeof subCategoryData === 'string') {
-                console.log("Searching for subcategory:", subCategoryData);
-
-                // First check if it's a valid ObjectId
-                if (mongoose.Types.ObjectId.isValid(subCategoryData)) {
-                    const subCategoryObj = await SubCategory.findById(subCategoryData);
-                    console.log("Found subcategory by ID:", subCategoryObj);
-                    if (!subCategoryObj) {
-                        return res.status(400).json({ message: "SubCategory not found." });
-                    }
-                    subCategoryId = subCategoryObj._id;
-                } else {
-                    // If not an ObjectId, search by name
-                    const subCategoryObj = await SubCategory.findOne({
-                        name: subCategoryData.toLowerCase()
-                    });
-                    console.log("Found subcategory by name:", subCategoryObj);
-                    if (!subCategoryObj) {
-                        return res.status(400).json({ message: "SubCategory not found." });
-                    }
-                    subCategoryId = subCategoryObj._id;
-                }
+                product.subCategory = subCategoryObj._id;
+            } else {
+                return res.status(400).json({ message: "Invalid subCategory ID format." });
             }
-
-            console.log("Subcategory id after update------->", subCategoryId);
         }
 
         // Handling the images update
@@ -370,19 +333,58 @@ const updateProduct = async (req, res) => {
             }
         }
 
-        // Handle variants update
+        // --- VARIANT IMAGE HANDLING (robust, preserve existing images) ---
+        let variantImageMap = {};
+        if (req.files?.variantImages && req.files.variantImages.length > 0) {
+            for (const file of req.files.variantImages) {
+                const parts = file.originalname.split('-');
+                const variantValue = parts.slice(1, parts.length - 1).join('-').replace(/\.[^/.]+$/, '').toLowerCase();
+                const uploadedImage = await uploadImage(file);
+                variantImageMap[variantValue] = uploadedImage.url;
+                console.log('Mapping variant value:', variantValue, 'to Cloudinary URL:', uploadedImage.url);
+            }
+        }
+
         let updatedVariants = [];
         if (parsedVariants) {
-            // Replace existing variants with the new ones, but preserve the image property
+            console.log("Processing variants update with parsedVariants:", parsedVariants);
+            console.log("Existing product variants:", product.variants);
+            
             updatedVariants = parsedVariants.map(newVariant => {
-                const existingVariant = product.variants.find(v => v.value === newVariant.value);
+                // Find the existing variant in the DB (by name)
+                const existingVariant = product.variants.find(v => v.name === newVariant.name);
+                console.log(`Processing variant "${newVariant.name}", existing variant:`, existingVariant);
+                
                 return {
                     ...newVariant,
-                    image: existingVariant ? existingVariant.image : newVariant.image // Preserve existing image if available
+                    values: newVariant.values.map(val => {
+                        console.log(`Processing variant value "${val.value}" with image:`, val.image);
+                        
+                        // Try to get the Cloudinary URL for this value (new upload)
+                        const key = val.value.toLowerCase();
+                        if (variantImageMap[key]) {
+                            console.log(`Found new uploaded image for "${val.value}":`, variantImageMap[key]);
+                            return { ...val, image: variantImageMap[key] };
+                        }
+                        
+                        // If no new image uploaded, preserve the existing image from DB
+                        if (existingVariant) {
+                            const existingValue = existingVariant.values.find(ev => ev.value === val.value);
+                            if (existingValue && existingValue.image) {
+                                console.log(`Preserving existing image for "${val.value}":`, existingValue.image);
+                                return { ...val, image: existingValue.image };
+                            }
+                        }
+                        
+                        // If no existing image found, keep the image as is (don't set to null)
+                        console.log(`No image found for "${val.value}", keeping as is:`, val.image);
+                        return val;
+                    })
                 };
             });
         } else {
-            // If no new variants are provided, keep the existing ones
+            // If no variants are being updated, keep the existing variants as they are
+            console.log("No variants update, preserving existing variants:", product.variants);
             updatedVariants = [...product.variants];
         }
 
@@ -394,35 +396,32 @@ const updateProduct = async (req, res) => {
             );
         }
 
-        // Handling variant images update (if any)
-        if (req.files?.variantImages && req.files.variantImages.length > 0) {
-            const variantImageMap = {};
-            for (const file of req.files.variantImages) {
-                // Extract the variant value from the filename (e.g., "color-red-Screenshot (4).png" => "red")
-                const variantValue = file.originalname.split('-')[1]?.toLowerCase();
-                const uploadedImage = await uploadImage(file);
-                variantImageMap[variantValue] = uploadedImage.url;
-            }
-
-            // Assign images to the correct variant values
-            updatedVariants = updatedVariants.map(variant => {
-                return {
-                    ...variant,
-                    values: variant.values.map(value => {
-                        if (variantImageMap[value.value.toLowerCase()]) {
-                            value.image = variantImageMap[value.value.toLowerCase()];
-                        }
-                        return value;
-                    }),
-                };
-            });
-        }
-
         // Handle Free Shipping & Delivery Charges
         if (req.body.freeShipping !== undefined) {
             const isFreeShipping = req.body.freeShipping === 'true' || req.body.freeShipping === true;
             product.freeShipping = isFreeShipping;
             product.deliveryCharges = isFreeShipping ? 0 : 200;
+        }
+
+        // Update special offer fields if provided
+        if (specialOfferEnabled === 'true' || specialOfferEnabled === true) {
+            if (specialOfferStart !== undefined) {
+                const startDate = new Date(specialOfferStart);
+                product.specialOfferStart = isNaN(startDate.getTime()) ? null : startDate;
+            }
+            if (specialOfferEnd !== undefined) {
+                const endDate = new Date(specialOfferEnd);
+                product.specialOfferEnd = isNaN(endDate.getTime()) ? null : endDate;
+            }
+            if (specialOfferPrice !== undefined) {
+                product.specialOfferPrice = specialOfferPrice;
+            }
+            product.specialOfferEnabled = true;
+        } else {
+            product.specialOfferEnabled = false;
+            product.specialOfferStart = null;
+            product.specialOfferEnd = null;
+            product.specialOfferPrice = null;
         }
 
         product.title = title || product.title;
@@ -431,9 +430,6 @@ const updateProduct = async (req, res) => {
         product.price = price || product.price;
         product.salePrice = salePrice === 'null' ? null : salePrice || product.salePrice;
         product.weight = weight || product.weight;
-        product.category = categoryId;
-        product.subCategory = subCategoryId
-        product.stock = stock || product.stock;
         product.brand = brandId;
         product.tags = tagIds.length > 0 ? tagIds : product.tags;
         product.images = updatedImages;
@@ -529,7 +525,7 @@ const getProductBySlug = async (req, res) => {
         await product.save();
 
 
-        console.log("Founded product----->", product)
+        // console.log("Founded product----->", product)
 
         res.status(200).json({
             success: true,
