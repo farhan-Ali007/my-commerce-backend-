@@ -26,27 +26,17 @@ dotenv.config()
 const app = express();
 
 // Security Middleware
-// TEMPORARY: Comment out helmet to disable CSP for testing
-// app.use(helmet({
-//   contentSecurityPolicy: {
-//     directives: {
-//       defaultSrc: ["'self'"],
-//       imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com", "https:"],
-//       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://www.googletagmanager.com", "https://www.google-analytics.com"],
-//       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-//       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-//       connectSrc: ["'self'", "https://res.cloudinary.com", "https://etimadmart.com", "https://www.google-analytics.com"],
-//       frameSrc: ["'self'"],
-//       objectSrc: ["'none'"],
-//       baseUri: ["'self'"],
-//       formAction: ["'self'"]
-//     }
-//   }
-// }));
-
-// Use basic helmet without CSP for testing
 app.use(helmet({
-  contentSecurityPolicy: false
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      connectSrc: ["'self'", "https://res.cloudinary.com"],
+      objectSrc: ["'none'"]
+    }
+  }
 }));
 
 app.use(mongoSanitize())
@@ -55,7 +45,7 @@ app.use(xss())
 
 // CORS configuration
 app.use(cors({
-    origin: ['http://localhost:5173', 'https://etimadmart.com','https://etimadmart.netlify.app'],
+    origin: ['http://localhost:5173', 'https://etimadmart.com',],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -114,9 +104,9 @@ connectDB();
 
 // Use cPanel's provided port or fallback to 3000
 const port = process.env.PORT || 3600;
-const host = process.env.HOST || '0.0.0.0';
+// const host = process.env.HOST || '0.0.0.0';
 // Start server
-app.listen(port, host, () => {
-    console.log(`Server running at http://${host}:${port}`);
+app.listen(port, () => {
+    // console.log(`Server running at http://${host}:${port}`);
     console.log(`Node.js version: ${process.version}`);
 });
