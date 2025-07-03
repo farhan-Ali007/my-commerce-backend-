@@ -103,7 +103,7 @@ const getMinMaxPrice = async (req, res) => {
 
 const filterByCategory = async (req, res) => {
     try {
-        let { categoryName, page = 1, limit = 6 } = req.query;
+        let { categoryName, page = 1, limit = 6 } = req.query;  //catgeory slug
         console.log("Category name in filterByCategory function:", categoryName);
 
         if (!categoryName || categoryName.length === 0) {

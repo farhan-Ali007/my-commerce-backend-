@@ -4,9 +4,7 @@ const orderSchema = new mongoose.Schema({
     orderedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User'},
     guestId: { type: String, required: false },
     shippingAddress: {
-        firstName: { type: String, required: true },
-        lastName: { type: String, required: true },
-        province: { type: String, required: true },
+        fullName: { type: String, required: true },
         city: { type: String, required: true },
         streetAddress: { type: String, required: true },
         apartment: { type: String },
