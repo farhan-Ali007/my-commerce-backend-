@@ -19,7 +19,7 @@ const orderSchema = new mongoose.Schema({
                 message: (props) => `${props.value} is not a valid Pakistani mobile number!`,
             },
         },
-        email: { type: String, required: true },
+        email: { type: String },
         additionalInstructions: { type: String },
     },
     cartSummary: [

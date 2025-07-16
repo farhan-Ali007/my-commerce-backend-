@@ -13,13 +13,14 @@ const generateSitemap = async (req, res) => {
             // Add other static pages here
         ];   
         // Fetch dynamic product URLs
-        const products = await Product.find({}, 'slug updatedAt'); // Fetch only slug and updatedAt fields
+        const products = await Product.find({}, 'slug updatedAt images'); // Fetch only slug and updatedAt fields
         products.forEach(product => {
             links.push({ 
                 url: `/product/${product.slug}`,
                 changefreq: 'weekly',
                 priority: 0.7,
                 lastmod: product.updatedAt,
+                img: product.images?.map(imgUrl => ({ url: imgUrl })) // adjust as per your schema
             }); 
         });
 

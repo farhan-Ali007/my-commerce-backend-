@@ -28,6 +28,15 @@ const addBanner = async (req, res) => {
     }
 };
 
+const getBannersForAdmin = async (req, res) => {
+    try {
+        const banners = await Banner.find({});
+        res.status(200).json(banners);
+    } catch (error) {
+        console.log("Error in fetching banners", error)
+        res.status(500).json({ message: "Server Error", error: error.message });
+    }
+};
 const getBanners = async (req, res) => {
     try {
         const banners = await Banner.find({isActive:true});
@@ -37,6 +46,7 @@ const getBanners = async (req, res) => {
         res.status(500).json({ message: "Server Error", error: error.message });
     }
 };
+
 
 const updateBanner = async (req, res) => {
     try {
@@ -91,4 +101,4 @@ const deleteBanner = async (req, res) => {
     }
 };
 
-module.exports = { addBanner, updateBanner, getBanners, deleteBanner };
+module.exports = { addBanner, updateBanner, getBanners, deleteBanner , getBannersForAdmin };

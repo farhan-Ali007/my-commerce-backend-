@@ -143,7 +143,7 @@ const getAllOrders = async (req, res) => {
         const [orders, total] = await Promise.all([
             Order.find({})
                 .populate('cartSummary.product', 'title price')
-                .populate('orderedBy', 'username email')
+                .populate('orderedBy', 'username email streetAddress')
                 .sort({ orderedAt: -1 })
                 .skip(skip)
                 .limit(limit),
@@ -171,7 +171,7 @@ const getRecentOrders = async (req, res) => {
 
         const recentOrders = await Order.find({ orderedAt: { $gte: last24Hours } })
             .populate('cartSummary.product', 'title price')
-            .populate('orderedBy', 'username email')
+            .populate('orderedBy', 'username email streetAddress')
             .sort({ orderedAt: -1 });
         res.status(200).json({
             success: true,
