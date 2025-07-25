@@ -37,7 +37,12 @@ app.use(
         imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com"],
         scriptSrc: ["'self'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        connectSrc: ["'self'", "https://res.cloudinary.com", "https://etimadmart.netlify.app"],
+       connectSrc: [
+          "'self'",
+          "https://res.cloudinary.com",
+          "https://etimadmart.up.railway.app",
+          "https://etimadmart.netlify.app"
+        ],
         objectSrc: ["'none'"],
       },
     },
