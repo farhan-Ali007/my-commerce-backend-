@@ -49,4 +49,4 @@ const generateSitemap = async (req, res) => {
     }
 };
 
-module.exports = { generateSitemap };
+module.exports =  generateSitemap ;

@@ -1,12 +1,12 @@
 const Category = require('../models/category.js')
-const { uploadImage } = require('../config/cloudinary.js')
+const { uploadImage , deleteImage } = require('../config/cloudinary.js')
 const Sub = require('../models/subCategory.js')
 const slugify = require('slugify');
 
 const createCategory = async (req, res) => {
     try {
 
-        const { name } = req.body;
+        const { name, metaDescription } = req.body;
         const file = req.file;
         if (!name)
             return res.status(400).json({ message: "Category name is required." })
@@ -23,6 +23,7 @@ const createCategory = async (req, res) => {
         try {
             const uploadedImage = await uploadImage(file)
             imageUrl = uploadedImage.url
+            imagePublicId = uploadedImage.public_id
         } catch (error) {
             console.log("Error in uploading category image")
         }
@@ -30,7 +31,9 @@ const createCategory = async (req, res) => {
         const newCategory = new Category({
             name: categoryName,
             slug: categorySlug,
-            Image: imageUrl
+            Image: imageUrl,
+            metaDescription: metaDescription || "",
+            imagePublicId: imagePublicId || ""
         })
         await newCategory.save()
 
@@ -84,6 +87,15 @@ const deleteCategory = async (req, res) => {
 
         if (!category)
             return res.status(404).json({ message: "Category not found" })
+
+        // Delete image from Cloudinary if exists
+        if (category.imagePublicId) {
+            try {
+                await deleteImage(category.imagePublicId);
+            } catch (cloudErr) {
+                console.log("Error deleting image from Cloudinary", cloudErr);
+            }
+        }
 
         const deletedCategory = await Category.findByIdAndDelete(id)
 
@@ -150,4 +162,38 @@ const updateMenuStatus = async (req, res) => {
     }
 };
 
-module.exports = { createCategory, getAllCategories, deleteCategory,updateMenuStatus , getMenuCategories} 
+const editCategory = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, metaDescription } = req.body;
+        let updateData = {};
+        const category = await Category.findById(id);
+
+        if (!category) return res.status(404).json({ message: "Category not found" });
+
+        if (name) {
+            updateData.name = name.toLowerCase();
+            updateData.slug = slugify(name, { lower: true, strict: true });
+        }
+        if (metaDescription !== undefined) {
+            updateData.metaDescription = metaDescription;
+        }
+        if (req.file) {
+            // Delete previous image from Cloudinary
+            if (category.imagePublicId) {
+                await deleteImage(category.imagePublicId); // You need to implement this function
+            }
+            const uploadedImage = await uploadImage(req.file);
+            updateData.Image = uploadedImage.url;
+            updateData.imagePublicId = uploadedImage.public_id;
+        }
+        const updatedCategory = await Category.findByIdAndUpdate(id, updateData, { new: true });
+        if (!updatedCategory) return res.status(404).json({ message: "Category not found" });
+        res.status(200).json({ success: true, updatedCategory, message: "Category updated." });
+    } catch (error) {
+        console.log("Error in editing category", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+module.exports = { createCategory, getAllCategories, deleteCategory, updateMenuStatus, getMenuCategories, editCategory } 

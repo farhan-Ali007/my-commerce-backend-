@@ -24,6 +24,10 @@ const subCategorySchema = new mongoose.Schema({
     imagePublicId: {
         type: String,
         default: ""
+    },
+    metaDescription: {
+        type: String,
+        default: ""
     }
 }, { timestamps: true });
 

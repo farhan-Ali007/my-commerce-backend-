@@ -4,7 +4,7 @@ const multer = require('multer')
 const upload = multer({ dest: "uploads/" })
 
 const { isAdmin, isAuthorized } = require('../middlewares/auth')
-
+const {getRedirectsByTo} = require('../controllers/redirect')
 const {
     createProduct,
     getAllProducts,
@@ -17,6 +17,7 @@ const {
     getProductsBySubCategory,
     getFeaturedProducts,
     getNewArrivals,
+    uploadDescriptionImage
 } = require('../controllers/product')
 
 // 🟢 Place specific routes BEFORE dynamic ones
@@ -27,6 +28,10 @@ router.get('/sub/:subCategory', getProductsBySubCategory)
 router.get('/related/:categoryId/:excludeProductId', getRelatedProducts)
 router.get('/featured', getFeaturedProducts)
 router.get('/new-arrivals', getNewArrivals)
+router.get('/redirects', getRedirectsByTo);
+
+// New endpoint for long description image upload
+router.post('/upload-description-image', upload.single('image'), uploadDescriptionImage)
 
 // 🟢 Dynamic routes should come LAST
 router.get('/:slug', getProductBySlug);

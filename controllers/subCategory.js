@@ -6,7 +6,7 @@ const { uploadImage, deleteImage } = require('../config/cloudinary.js');
 
 const createSub = async (req, res) => {
     try {
-        const { name, category } = req.body;
+        const { name, category, metaDescription } = req.body;
         const file = req.file;
 
         if (!name) return res.status(400).json({ message: "Subcategory name is required." });
@@ -43,7 +43,8 @@ const createSub = async (req, res) => {
             name: name.toLowerCase(),
             category: existingCategory._id,
             image: imageUrl,
-            imagePublicId: imagePublicId
+            imagePublicId: imagePublicId,
+            metaDescription: metaDescription || ""
         });
 
         await newSubCategory.save();
@@ -107,4 +108,38 @@ const deleteSub = async (req, res) => {
     }
 };
 
-module.exports = { createSub, getAllSubs, deleteSub };
+// Edit subcategory controller
+const editSub = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, metaDescription } = req.body;
+        let updateData = {};
+        const subCategory = await SubCategory.findById(id);
+        if (!subCategory) return res.status(404).json({ message: "Subcategory not found." });
+
+        if (name) {
+            updateData.name = name.toLowerCase();
+            updateData.slug = slugify(name, { lower: true, strict: true });
+        }
+        if (metaDescription !== undefined) {
+            updateData.metaDescription = metaDescription;
+        }
+        if (req.file) {
+            // Delete previous image from Cloudinary
+            if (subCategory.imagePublicId) {
+                await deleteImage(subCategory.imagePublicId);
+            }
+            const uploadedImage = await uploadImage(req.file);
+            updateData.image = uploadedImage.url;
+            updateData.imagePublicId = uploadedImage.public_id;
+        }
+        const updatedSub = await SubCategory.findByIdAndUpdate(id, updateData, { new: true });
+        if (!updatedSub) return res.status(404).json({ message: "Subcategory not found." });
+        res.status(200).json({ success: true, updatedSub, message: "Subcategory updated." });
+    } catch (error) {
+        console.log("Error in editing subcategory", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+module.exports = { createSub, getAllSubs, deleteSub, editSub };

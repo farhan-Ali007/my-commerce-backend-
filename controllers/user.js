@@ -30,8 +30,8 @@ const signup = async (req, res) => {
       email,
       password: hashedPassword,
     });
-    const token = generateTokenAndSetCookies(res, newUser._id);
     await newUser.save();
+    const token = generateTokenAndSetCookies(res, newUser._id);
 
     res.status(200).json({
       success: true,
@@ -157,6 +157,20 @@ const updateUserRole = async (req, res) => {
   }
 };
 
+const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByIdAndDelete(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    res.status(200).json({ success: true, message: "User deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 module.exports = {
   signup,
   login,
@@ -164,4 +178,5 @@ module.exports = {
   getUser,
   getAllUsers,
   updateUserRole,
+  deleteUser,
 };
