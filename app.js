@@ -50,7 +50,7 @@ app.use(xss());
 // CORS configuration
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://etimadmart.com"],
+    origin: ["http://localhost:5173", "https://etimadmart.com","https://etimadmart.netlify.app/"],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
