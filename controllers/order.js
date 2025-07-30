@@ -136,29 +136,33 @@ const creatOrder = async (req, res) => {
       // Send email notification to admin
       try {
         // Get product details for email
-        const productIds = cartSummary.map(item => item.productId);
-        const products = await Product.find({ _id: { $in: productIds } }).select('title slug price');
-        
+        const productIds = cartSummary.map((item) => item.productId);
+        const products = await Product.find({
+          _id: { $in: productIds },
+        }).select("title slug price");
+
         // Map cart items with product details
-        const productsWithDetails = cartSummary.map(item => {
-          const product = products.find(p => p._id.toString() === item.productId);
+        const productsWithDetails = cartSummary.map((item) => {
+          const product = products.find(
+            (p) => p._id.toString() === item.productId
+          );
           return {
             ...item,
-            title: product?.title || 'Unknown Product',
-            slug: product?.slug || 'product',
-            price: product?.price || 0
+            title: product?.title || "Unknown Product",
+            slug: product?.slug || "product",
+            price: product?.price || 0,
           };
         });
 
-        await sendOrderEmailToAdmin({
+        const orderEmail = await sendOrderEmailToAdmin({
           order: savedOrder,
           products: productsWithDetails,
-          adminEmail: process.env.ADMIN_EMAIL || 'info@etimadmart.com'
+          adminEmail: process.env.ADMIN_EMAIL || "info@etimadmart.com",
         });
-        
-        console.log('Order notification email sent to admin');
+
+        console.log("Order notification email sent to admin", orderEmail);
       } catch (emailError) {
-        console.error('Error sending order email to admin:', emailError);
+        console.error("Error sending order email to admin:", emailError);
         // Don't fail the order creation if email fails
       }
     } catch (adminNotificationError) {
@@ -234,25 +238,25 @@ const updateOrderStatus = async (req, res) => {
     // Create notification for user when order status changes
     if (updatedOrder.orderedBy) {
       try {
-        let notificationType = 'order_status';
-        let notificationTitle = 'Order Status Updated';
+        let notificationType = "order_status";
+        let notificationTitle = "Order Status Updated";
         let notificationMessage = `Your order #${orderId}\nstatus has been updated to "${status}".`;
 
         // Use specific notification types for different statuses
         switch (status) {
-          case 'shipped':
-            notificationType = 'order_shipped';
-            notificationTitle = 'Order Shipped!';
+          case "shipped":
+            notificationType = "order_shipped";
+            notificationTitle = "Order Shipped!";
             notificationMessage = `Your order #${orderId}\nhas been shipped and is on its way to you!`;
             break;
-          case 'delivered':
-            notificationType = 'order_delivered';
-            notificationTitle = 'Order Delivered!';
+          case "delivered":
+            notificationType = "order_delivered";
+            notificationTitle = "Order Delivered!";
             notificationMessage = `Your order #${orderId}\nhas been delivered successfully!`;
             break;
-          case 'cancelled':
-            notificationType = 'order_cancelled';
-            notificationTitle = 'Order Cancelled';
+          case "cancelled":
+            notificationType = "order_cancelled";
+            notificationTitle = "Order Cancelled";
             notificationMessage = `Your order #${orderId}\nhas been cancelled.`;
             break;
         }
@@ -266,7 +270,10 @@ const updateOrderStatus = async (req, res) => {
           { orderStatus: status }
         );
       } catch (notificationError) {
-        console.error('Error creating status update notification:', notificationError);
+        console.error(
+          "Error creating status update notification:",
+          notificationError
+        );
         // Don't fail the status update if notification fails
       }
     }
