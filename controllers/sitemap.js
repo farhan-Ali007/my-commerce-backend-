@@ -1,15 +1,25 @@
 const { SitemapStream, streamToPromise } = require('sitemap');
 const { Readable } = require('stream');
 const Product = require('../models/product'); 
+const Category = require('../models/category');
+const SubCategory = require('../models/subCategory');
 
 const generateSitemap = async (req, res) => {
     try { 
         const links = [
-            { url: '/', changefreq: 'daily', priority: 1.0 },
-            { url: '/shop', changefreq: 'weekly', priority: 0.8 },
-            { url: '/cart', changefreq: 'monthly', priority: 0.5 },
-            { url: '/login', changefreq: 'monthly', priority: 0.3 },
-            { url: '/signup', changefreq: 'monthly', priority: 0.3 },
+                { url: '/', changefreq: 'daily', priority: 1.0 },
+                { url: '/shop', changefreq: 'weekly', priority: 0.8 },
+                { url: '/cart', changefreq: 'monthly', priority: 0.5 },
+                { url: '/login', changefreq: 'monthly', priority: 0.3 },
+                { url: '/signup', changefreq: 'monthly', priority: 0.3 },
+                { url: '/contact', changefreq: 'monthly', priority: 0.3 },
+                { url: '/about', changefreq: 'monthly', priority: 0.3 },
+                { url: '/privacy-policy', changefreq: 'monthly', priority: 0.3 },
+                { url: '/terms-and-conditions', changefreq: 'monthly', priority: 0.3 },
+                { url: '/refund-policy', changefreq: 'monthly', priority: 0.3 },
+                { url: '/shipping-policy', changefreq: 'monthly', priority: 0.3 },
+                { url: '/return-policy', changefreq: 'monthly', priority: 0.3 },
+                
             // Add other static pages here
         ];   
         // Fetch dynamic product URLs
@@ -22,6 +32,26 @@ const generateSitemap = async (req, res) => {
                 lastmod: product.updatedAt,
                 img: product.images?.map(imgUrl => ({ url: imgUrl })) // adjust as per your schema
             }); 
+        });
+
+        // Fetch categories
+        const categories = await Category.find({}, 'slug');
+        categories.forEach(category => {
+            links.push({
+                url: `/category/${category.slug}`,
+                changefreq: 'weekly',
+                priority: 0.7,
+            });
+        });
+
+        // Fetch subcategories
+        const subcategories = await SubCategory.find({}, 'slug parentCategorySlug');
+        subcategories.forEach(sub => {
+            links.push({
+                url: `/category/${sub.parentCategorySlug}/${sub.slug}`,
+                changefreq: 'weekly',
+                priority: 0.6,
+            });
         });
 
         const sitemapStream = new SitemapStream({ hostname: `${req.protocol}://${req.get('host')}` });

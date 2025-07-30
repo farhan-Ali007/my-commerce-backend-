@@ -18,6 +18,15 @@ const userSchema = new mongoose.Schema({
     role: {
         type: String,
         default: "user"
+    },
+    status: {
+        type: String,
+        enum: ['active', 'inactive', 'suspended'],
+        default: 'active'
+    },
+    lastActive: {
+        type: Date,
+        default: Date.now
     }
 }, { timestamps: true })
 

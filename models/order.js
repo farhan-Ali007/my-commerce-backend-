@@ -5,9 +5,7 @@ const orderSchema = new mongoose.Schema({
     guestId: { type: String, required: false },
     shippingAddress: {
         fullName: { type: String, required: true },
-        city: { type: String, required: true },
         streetAddress: { type: String, required: true },
-        apartment: { type: String },
         mobile: {
             type: String,
             required: true,
@@ -19,7 +17,6 @@ const orderSchema = new mongoose.Schema({
                 message: (props) => `${props.value} is not a valid Pakistani mobile number!`,
             },
         },
-        email: { type: String },
         additionalInstructions: { type: String },
     },
     cartSummary: [

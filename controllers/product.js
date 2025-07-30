@@ -92,7 +92,7 @@ const createProduct = async (req, res) => {
 
         // **Handle Free Shipping & Delivery Charges**
         const isFreeShipping = freeShipping === 'true' || freeShipping === true;
-        const deliveryCharges = isFreeShipping ? 0 : 200;
+        const deliveryCharges = isFreeShipping ? 0 : 250;
         // Create product
         const currentUserId = req.user.id;
         const newProduct = new Product({
@@ -474,15 +474,15 @@ const getAllProducts = async (req, res) => {
         const totalPages = Math.ceil(totalProducts / limit);
 
         const products = await Product.find({})
-            .populate('category', 'name')
+            .populate('category', 'name slug')
             .populate('tags', 'name')
             .populate('brand', 'name')
             .populate({
                 path: 'reviews',
-                select: 'rating reviewText',
+                select: 'rating reviewText createdAt',
                 populate: {
                     path: 'reviewerId', // Populate reviewer details
-                    select: 'name email'
+                    select: 'username email'
                 }
             })
             .skip(skip)
@@ -522,10 +522,10 @@ const getProductBySlug = async (req, res) => {
             .populate('brand', 'name')
             .populate({
                 path: 'reviews',
-                select: 'rating reviewText',
+                select: 'rating reviewText createdAt',
                 populate: {
                     path: 'reviewerId',
-                    select: 'name email'
+                    select: 'username email'
                 }
             });
 
@@ -609,7 +609,7 @@ const deleteProduct = async (req, res) => {
 const getMyProducts = async (req, res) => {
     try {
         const products = await Product.find({ creator: req.user.id })
-            .populate('category', 'name')
+            .populate('category', 'name slug')
             .populate('tags', 'name')
             .sort({ createdAt: -1 })
 
@@ -638,7 +638,7 @@ const getRelatedProducts = async (req, res) => {
             category: categoryId,
             _id: { $ne: excludeProductId }
         })
-            .populate('category', 'name')
+            .populate('category', 'name slug')
             .populate('tags', 'name')
             .skip(skip)
             .limit(limit)
@@ -652,7 +652,7 @@ const getRelatedProducts = async (req, res) => {
             ]);
 
             relatedProducts = await Product.populate(relatedProducts, [
-                { path: 'category', select: 'name' },
+                { path: 'category', select: 'name slug' },
                 { path: 'tags', select: 'name' }
             ]);
         }
@@ -702,15 +702,15 @@ const getBestSellers = async (req, res) => {
         const totalPages = Math.ceil(totalProducts / limit);
 
         const products = await Product.find({ tags: { $in: [bestSellerTag._id] } })
-            .populate('category', 'name')
+            .populate('category', 'name slug')
             .populate('tags', 'name')
             .populate('brand', 'name')
             .populate({
                 path: 'reviews',
-                select: 'rating reviewText',
+                select: 'rating reviewText createdAt',
                 populate: {
                     path: 'reviewerId',
-                    select: 'name email'
+                    select: 'username email'
                 }
             })
             .skip(skip)
@@ -755,15 +755,15 @@ const getProductsBySubCategory = async (req, res) => {
         const totalPages = Math.ceil(totalProducts / limit);
 
         const products = await Product.find({ subCategory: subCategoryDoc._id })
-            .populate('category', 'name')
+            .populate('category', 'name slug')
             .populate('tags', 'name')
             .populate('brand', 'name')
             .populate({
                 path: 'reviews',
-                select: 'rating reviewText',
+                select: 'rating reviewText createdAt',
                 populate: {
                     path: 'reviewerId',
-                    select: 'name email'
+                    select: 'username email'
                 }
             })
             .sort([['updatedAt', 'desc'], ['createdAt', 'desc']])
@@ -809,15 +809,15 @@ const getFeaturedProducts = async (req, res) => {
         const totalPages = Math.ceil(totalProducts / limit);
 
         const products = await Product.find({ tags: { $in: [featuredTag._id] } })
-            .populate('category', 'name')
+            .populate('category', 'name slug')
             .populate('tags', 'name')
             .populate('brand', 'name')
             .populate({
                 path: 'reviews',
-                select: 'rating reviewText',
+                select: 'rating reviewText createdAt',
                 populate: {
                     path: 'reviewerId',
-                    select: 'name email'
+                    select: 'username email'
                 }
             })
             .skip(skip)
@@ -869,15 +869,15 @@ const getNewArrivals = async (req, res) => {
         const totalPages = Math.ceil(totalProducts / limit);
 
         const products = await Product.find({ tags: { $in: [newTag._id] } })
-            .populate('category', 'name')
+            .populate('category', 'name slug')
             .populate('tags', 'name')
             .populate('brand', 'name')
             .populate({
                 path: 'reviews',
-                select: 'rating reviewText',
+                select: 'rating reviewText createdAt',
                 populate: {
                     path: 'reviewerId',
-                    select: 'name email'
+                    select: 'username email'
                 }
             })
             .skip(skip)

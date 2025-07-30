@@ -1,6 +1,7 @@
 const User = require("../models/user");
 const bcrypt = require("bcryptjs");
 const generateTokenAndSetCookies = require("../utils/generateToken");
+const { createNotification } = require('./notification');
 
 const signup = async (req, res) => {
   try {
@@ -150,6 +151,19 @@ const updateUserRole = async (req, res) => {
     user.role = newRole;
     await user.save();
 
+    try {
+      await createNotification(
+        user._id,
+        'role_change', // or use a new type like 'role_change' if you want
+        'Role Changed',
+        `Your account role has been changed to "${newRole}" by an admin.`,
+        null,
+        { newRole }
+      );
+    } catch (notificationError) {
+      console.error('Error creating role change notification:', notificationError);
+    }
+
     return res.status(200).json({ message: `Role updated to ${newRole}.` });
   } catch (error) {
     console.error("Error in updating user's role:", error);
@@ -171,6 +185,99 @@ const deleteUser = async (req, res) => {
   }
 };
 
+// Update user status
+const updateUserStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!['active', 'inactive', 'suspended'].includes(status)) {
+      return res.status(400).json({ 
+        message: "Invalid status. Must be 'active', 'inactive', or 'suspended'." 
+      });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    const oldStatus = user.status;
+    user.status = status;
+    user.lastActive = new Date();
+    await user.save();
+
+    // Create notification for status change
+    try {
+      let title, message;
+      switch (status) {
+        case 'suspended':
+          title = 'Account Suspended';
+          message = 'Your account has been suspended. Please contact support for more information.';
+          break;
+        case 'inactive':
+          title = 'Account Deactivated';
+          message = 'Your account has been deactivated. You can reactivate it by contacting support.';
+          break;
+        case 'active':
+          title = 'Account Reactivated';
+          message = 'Your account has been reactivated. Welcome back!';
+          break;
+      }
+      
+      // Create notification for the user whose status was changed
+      await createNotification(
+        user._id,
+        'user_status',
+        title,
+        message,
+        null,
+        { oldStatus, newStatus: status }
+      );
+      
+      // Create notification for the admin who made the change
+      const adminId = req.user.id;
+      if (adminId && adminId.toString() !== user._id.toString()) {
+        await createNotification(
+          adminId,
+          'user_status',
+          'User Status Updated',
+          `You have updated ${user.username}'s status to ${status}.`,
+          null,
+          { targetUser: user.username, oldStatus, newStatus: status }
+        );
+      }
+    } catch (notificationError) {
+      console.error('Error creating status notification:', notificationError);
+      // Don't fail the status update if notification fails
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      message: `User status updated to ${status}.`,
+      user: {
+        ...user._doc,
+        password: undefined
+      }
+    });
+  } catch (error) {
+    console.error("Error in updating user's status:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Update user's last active timestamp
+const updateLastActive = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    await User.findByIdAndUpdate(userId, { lastActive: new Date() });
+    res.status(200).json({ success: true, message: "Last active updated." });
+  } catch (error) {
+    console.error("Error updating last active:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 module.exports = {
   signup,
   login,
@@ -179,4 +286,6 @@ module.exports = {
   getAllUsers,
   updateUserRole,
   deleteUser,
+  updateUserStatus,
+  updateLastActive,
 };

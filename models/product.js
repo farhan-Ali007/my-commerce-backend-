@@ -147,7 +147,7 @@ productSchema.pre('save', function (next) {
     if (!this.slug) {
         this.slug = slugify(this.title, { lower: true, strict: true });
     }
-    this.deliveryCharges = this.freeShipping ? 0 : 200;
+    this.deliveryCharges = this.freeShipping ? 0 : 250;
     next();
 });
 

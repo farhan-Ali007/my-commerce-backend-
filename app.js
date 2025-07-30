@@ -24,6 +24,7 @@ const bannerRouter = require("./routes/banner.js");
 const brandRouter = require("./routes/brand.js");
 const sitemapRoute = require("./routes/sitemap");
 const dynamicPageRouter = require("./routes/dynamicPage");
+const notificationRouter = require("./routes/notification.js");
 
 dotenv.config();
 const app = express();
@@ -96,6 +97,7 @@ app.use("/api/v1/banner", bannerRouter);
 app.use("/api/v1/brand", brandRouter);
 app.use("/api/v1/topbar", topBarRouter);
 app.use("/api/v1/footer", footerRouter);
+app.use("/api/v1/notification", notificationRouter);
 app.use("/", sitemapRoute);
 app.use("/", productFeedRouter);
 app.use("/api/v1/page", dynamicPageRouter);
