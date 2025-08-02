@@ -64,7 +64,7 @@ const createSub = async (req, res) => {
 const getAllSubs = async (req, res) => {
     try {
         const subCategories = await SubCategory.find({})
-            .populate('category', 'name image')
+            .populate('category', 'name image metaDescription')
             .sort({ createdAt: -1 });
         res.status(200).json({
             success: true,
