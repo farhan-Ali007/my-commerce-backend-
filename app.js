@@ -121,9 +121,14 @@ app.use("/api/v1/footer", footerRouter);
 app.use("/api/v1/notification", notificationRouter);
 app.use("/api/v1/colorSettings", colorSettingsRouter);
 app.use("/api/v1/popup", popupRouter);
-app.use("/", sitemapRoute);
-app.use("/", productFeedRouter);
+
+// Register sitemap route BEFORE dynamic page route to avoid conflicts
+app.get("/sitemap.xml", (req, res, next) => {
+    const generateSitemap = require("./controllers/sitemap");
+    generateSitemap(req, res, next);
+});
 app.use("/api/v1/page", dynamicPageRouter);
+app.use("/", productFeedRouter);
 
 // // Serve frontend static files
 // app.use(express.static(path.join(__dirname, "../frontend/dist")));
