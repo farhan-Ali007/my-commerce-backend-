@@ -7,26 +7,101 @@ const Brand = require('../models/brand');
 
 const liveSearch = async (req, res) => {
     try {
-        const { query } = req.query;
-        const limit = parseInt(req.query.limit) || 10; 
+        const { 
+            query, 
+            page = 1, 
+            limit = 16,
+            categories,
+            brand,
+            rating,
+            minPrice,
+            maxPrice,
+            sort = 'relevance'
+        } = req.query;
 
         if (!query) {
             return res.status(400).json({ message: 'Search query is required.' });
         }
 
+        // Build search query
+        let searchQuery = { $text: { $search: query } };
+        
+        // Add category filter
+        if (categories && categories.length > 0) {
+            const categoryArray = Array.isArray(categories) ? categories : categories.split(',');
+            const categoryDocs = await Category.find({ slug: { $in: categoryArray } });
+            if (categoryDocs.length > 0) {
+                searchQuery.category = { $in: categoryDocs.map(cat => cat._id) };
+            }
+        }
+
+        // Add brand filter
+        if (brand) {
+            const brandDoc = await Brand.findOne({ name: brand });
+            if (brandDoc) {
+                searchQuery.brand = brandDoc._id;
+            }
+        }
+
+        // Add rating filter
+        if (rating) {
+            searchQuery.averageRating = { $gte: parseFloat(rating) };
+        }
+
+        // Add price range filter
+        if (minPrice || maxPrice) {
+            searchQuery.price = {};
+            if (minPrice) searchQuery.price.$gte = parseFloat(minPrice);
+            if (maxPrice) searchQuery.price.$lte = parseFloat(maxPrice);
+        }
+
+        // Calculate pagination
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        
+        // Get total count
+        const totalProducts = await Product.countDocuments(searchQuery);
+        const totalPages = Math.ceil(totalProducts / parseInt(limit));
+
+        // Build sort object
+        let sortObject = {};
+        if (sort === 'price_asc') {
+            sortObject = { price: 1 };
+        } else if (sort === 'price_desc') {
+            sortObject = { price: -1 };
+        } else if (sort === 'newest') {
+            sortObject = { createdAt: -1 };
+        } else {
+            // Default: relevance (text score)
+            sortObject = { score: { $meta: "textScore" } };
+        }
+
         const products = await Product.find(
-            { $text: { $search: query } },
-            { score: { $meta: "textScore" } } 
+            searchQuery,
+            { score: { $meta: "textScore" } }
         )
-            .populate('category', 'title images category')
-            .populate('tags', 'title')
-            .sort({ score: { $meta: "textScore" } }) 
-            .limit(limit);
+            .populate('category', 'name slug')
+            .populate('subCategory', 'name slug')
+            .populate('tags', 'name')
+            .populate('brand', 'name')
+            .populate({
+                path: 'reviews',
+                select: 'rating reviewText createdAt',
+                populate: {
+                    path: 'reviewerId',
+                    select: 'username email'
+                }
+            })
+            .sort(sortObject)
+            .skip(skip)
+            .limit(parseInt(limit));
 
         res.status(200).json({
             success: true,
             message: 'Search results fetched successfully.',
-            products
+            products,
+            currentPage: parseInt(page),
+            totalPages,
+            totalProducts
         });
     } catch (error) {
         console.error("Error in live search:", error);
@@ -255,7 +330,14 @@ const filterProductsbyBrands = async (req, res) => {
         const { brand } = req.params;
         const { page = 1, limit = 10 } = req.query;
 
-        const brandData = await Brand.findOne({ name: brand });
+        // Try to find brand by slug first, then by name for backward compatibility
+        const brandData = await Brand.findOne({ 
+            $or: [
+                { slug: brand },
+                { name: brand }
+            ]
+        });
+        
         if (!brandData) {
             return res.status(404).json({ success: false, message: "Brand not found" });
         }
@@ -268,7 +350,7 @@ const filterProductsbyBrands = async (req, res) => {
         const products = await Product.find({ brand: brandData._id })
             .populate('category', 'name')
             .populate('tags', 'name')
-            .populate('brand', 'name')
+            .populate('brand', 'name slug')
             .populate({
                 path: 'reviews',
                 select: 'rating reviewText',
@@ -289,7 +371,12 @@ const filterProductsbyBrands = async (req, res) => {
             currentPage: Number(page),
             totalPages,
             totalProducts,
-            products
+            products,
+            brand: {
+                _id: brandData._id,
+                name: brandData.name,
+                slug: brandData.slug
+            }
         });
     } catch (error) {
         console.error("Error in fetching by brands", error);

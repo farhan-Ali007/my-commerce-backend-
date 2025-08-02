@@ -415,7 +415,7 @@ const updateProduct = async (req, res) => {
         if (req.body.freeShipping !== undefined) {
             const isFreeShipping = req.body.freeShipping === 'true' || req.body.freeShipping === true;
             product.freeShipping = isFreeShipping;
-            product.deliveryCharges = isFreeShipping ? 0 : 200;
+            product.deliveryCharges = isFreeShipping ? 0 : 250;
         }
 
         // Update special offer fields if provided

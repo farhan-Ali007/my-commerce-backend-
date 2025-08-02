@@ -25,6 +25,8 @@ const brandRouter = require("./routes/brand.js");
 const sitemapRoute = require("./routes/sitemap");
 const dynamicPageRouter = require("./routes/dynamicPage");
 const notificationRouter = require("./routes/notification.js");
+const colorSettingsRouter = require("./routes/colorSettings.js");
+const popupRouter = require("./routes/popup.js");
 
 dotenv.config();
 const app = express();
@@ -36,15 +38,31 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-       connectSrc: [
+        connectSrc: [
           "'self'",
           "https://res.cloudinary.com",
           "https://etimadmart.up.railway.app",
-          "https://etimadmart.netlify.app"
+          "https://etimadmart.netlify.app",
+          "https://etimadmart.com",
+          "https://etimadmart.com/api/v1",
+          "https://www.google-analytics.com",
+          "https://www.facebook.com",
+          "https://*.us-central1.run.app",
+          "https://mpc-prod-1-1053047382554.us-central1.run.app",
+          "https://mpc-prod-2-1053047382554.us-central1.run.app",
+          "https://*.run.app",
+          "wss://*.us-central1.run.app",
+          "wss://*.run.app",
+          "ws://localhost:*",
+          "http://localhost:*",
+          "https://localhost:*"
         ],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
         objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'self'"],
       },
     },
   })
@@ -67,6 +85,9 @@ app.use(
 app.use(cookieParser());
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(express.json());
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static('uploads'));
 
 // app.get('/', (req, res) => {
 //     res.send("<h1>Hello , welcome back</h1>")
@@ -98,6 +119,8 @@ app.use("/api/v1/brand", brandRouter);
 app.use("/api/v1/topbar", topBarRouter);
 app.use("/api/v1/footer", footerRouter);
 app.use("/api/v1/notification", notificationRouter);
+app.use("/api/v1/colorSettings", colorSettingsRouter);
+app.use("/api/v1/popup", popupRouter);
 app.use("/", sitemapRoute);
 app.use("/", productFeedRouter);
 app.use("/api/v1/page", dynamicPageRouter);

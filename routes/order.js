@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const { isAuthorized, isAdmin } = require('..//middlewares/auth');
+const { isAuthorized, isAdmin } = require('../middlewares/auth');
 const { creatOrder, getMyOrders, getAllOrders, updateOrderStatus, getRecentOrders } = require('../controllers/order');
 
 router.get('/all', isAuthorized, isAdmin, getAllOrders)
