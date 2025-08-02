@@ -142,4 +142,26 @@ const editSub = async (req, res) => {
     }
 };
 
-module.exports = { createSub, getAllSubs, deleteSub, editSub };
+const getSubCategoryBySlug = async (req, res) => {
+    try {
+        const { slug } = req.params;
+        
+        const subCategory = await SubCategory.findOne({ slug })
+            .populate('category', 'name slug image metaDescription');
+            
+        if (!subCategory) {
+            return res.status(404).json({ message: "Subcategory not found." });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Subcategory fetched successfully.",
+            subCategory
+        });
+    } catch (error) {
+        console.log("Error in fetching subcategory by slug", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+module.exports = { createSub, getAllSubs, deleteSub, editSub, getSubCategoryBySlug };
