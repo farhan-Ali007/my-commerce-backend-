@@ -43,7 +43,8 @@ const sendOrderEmailToAdmin = async ({ order, products, adminEmail }) => {
         <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #333; margin-top: 0;">Customer Information</h3>
           <p><strong>Full Name:</strong> ${order.shippingAddress.fullName}</p>
-          <p><strong>Phone:</strong> ${order.shippingAddress.phone}</p>
+          <p><strong>Phone:</strong> ${order.shippingAddress.mobile}</p>
+          <p><strong>City:</strong> ${order.shippingAddress.city}</p>
           <p><strong>Address:</strong> ${
             order.shippingAddress.streetAddress
           }</p>
