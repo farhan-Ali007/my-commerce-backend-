@@ -54,7 +54,12 @@ const generateSitemap = async (req, res) => {
             });
         });
 
-        const sitemapStream = new SitemapStream({ hostname: `${req.protocol}://${req.get('host')}` });
+        // Use production domain for sitemap URLs
+        const hostname = process.env.NODE_ENV === 'production' 
+            ? 'https://etimadmart.com' 
+            : `${req.protocol}://${req.get('host')}`;
+        
+        const sitemapStream = new SitemapStream({ hostname });
 
         // Set the content type header before piping the stream
         res.setHeader('Content-Type', 'application/xml');
