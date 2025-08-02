@@ -53,7 +53,7 @@ const getAllCategories = async (req, res) => {
     try {
         // Fetch all categories
         const categories = await Category.find({})
-        .select("name slug Image menu")
+        .select("name slug Image menu metaDescription")
         .sort({ createdAt: -1 });
 
         // For each category, populate its subcategories
