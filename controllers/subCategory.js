@@ -12,7 +12,16 @@ const createSub = async (req, res) => {
         if (!name) return res.status(400).json({ message: "Subcategory name is required." });
         if (!category) return res.status(400).json({ message: "Parent category is required." });
 
-        const existingCategory = await Category.findOne({ name: category });
+        // Check if category is an ObjectId or name
+        let existingCategory;
+        if (category.match(/^[0-9a-fA-F]{24}$/)) {
+            // It's an ObjectId, search by _id
+            existingCategory = await Category.findById(category);
+        } else {
+            // It's a name, search by name
+            existingCategory = await Category.findOne({ name: category });
+        }
+        
         if (!existingCategory) return res.status(404).json({ message: "Category not found." });
 
         const subCategoryName = name.toLowerCase()
