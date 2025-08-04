@@ -137,6 +137,7 @@ const creatOrder = async (req, res) => {
       try {
         // Get product details for email
         const productIds = cartSummary.map((item) => item.productId);
+        
         const products = await Product.find({
           _id: { $in: productIds },
         }).select("title slug price");
@@ -154,13 +155,13 @@ const creatOrder = async (req, res) => {
           };
         });
 
-        const orderEmail = await sendOrderEmailToAdmin({
+        const adminEmail = process.env.ADMIN_EMAIL || "info@etimadmart.com";
+
+        await sendOrderEmailToAdmin({
           order: savedOrder,
           products: productsWithDetails,
-          adminEmail: process.env.ADMIN_EMAIL || "info@etimadmart.com",
+          adminEmail: adminEmail,
         });
-
-        console.log("Order notification email sent to admin", orderEmail);
       } catch (emailError) {
         console.error("Error sending order email to admin:", emailError);
         // Don't fail the order creation if email fails

@@ -1,10 +1,10 @@
 const nodemailer = require("nodemailer");
 
-// Create transporter (you'll need to add SMTP credentials to .env)
+// Create transporter
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
   port: process.env.SMTP_PORT || 587,
-  secure: false, // true for 465, false for other ports
+  secure: false,
   auth: {
     user: process.env.EMAIL_USERNAME,
     pass: process.env.EMAIL_PASSWORD,
@@ -27,7 +27,7 @@ const sendOrderEmailToAdmin = async ({ order, products, adminEmail }) => {
         </a>
         <br>
         <span style="color: #666; font-size: 14px;">
-          Quantity: ${item.count} | Price: Rs.${item.price.toLocaleString()}
+          Quantity: ${item.count} | Price: Rs.${item.salePrice.toLocaleString()}
         </span>
       </li>
     `
@@ -43,14 +43,14 @@ const sendOrderEmailToAdmin = async ({ order, products, adminEmail }) => {
         <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #333; margin-top: 0;">Customer Information</h3>
           <p><strong>Full Name:</strong> ${order.shippingAddress.fullName}</p>
-          <p><strong>Phone:</strong> ${order.shippingAddress.mobile}</p>
-          <p><strong>City:</strong> ${order.shippingAddress.city}</p>
+          <p><strong>Phone:</strong> ${order.shippingAddress?.mobile}</p>
+          <p><strong>City:</strong> ${order.shippingAddress?.city}</p>
           <p><strong>Address:</strong> ${
-            order.shippingAddress.streetAddress
+            order.shippingAddress?.streetAddress
           }</p>
           <p><strong>Order ID:</strong> ${order._id}</p>
           <p><strong>Order Date:</strong> ${new Date(
-            order.createdAt
+            order.orderedAt
           ).toLocaleString()}</p>
         </div>
 
@@ -94,10 +94,6 @@ const sendOrderEmailToAdmin = async ({ order, products, adminEmail }) => {
     };
 
     const result = await transporter.sendMail(mailOptions);
-    console.log(
-      "Order notification email sent successfully:",
-      result.messageId
-    );
     return result;
   } catch (error) {
     console.error("Failed to send order email to admin:", error);
