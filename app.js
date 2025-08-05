@@ -74,7 +74,13 @@ app.use(xss());
 // CORS configuration
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://etimadmart.com","https://etimadmart.netlify.app"],
+    origin: [
+      "http://localhost:5173", 
+      "https://etimadmart.com",
+      "https://etimadmart.netlify.app",
+      "https://dev--etimadmart.netlify.app",
+      "https://*.netlify.app"  // Allow all Netlify preview URLs
+    ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],

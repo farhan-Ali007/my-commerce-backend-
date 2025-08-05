@@ -6,12 +6,6 @@ const SubCategory = require('../models/subCategory');
 
 const generateSitemap = async (req, res) => {
     try { 
-        // Use BASE_URL environment variable, with fallback to production domain
-        console.log('=== SITEMAP DEBUG ===');
-        console.log('BASE_URL:', process.env.BASE_URL);
-        console.log('NODE_ENV:', process.env.NODE_ENV);
-        console.log('All env vars:', Object.keys(process.env).filter(key => key.includes('BASE') || key.includes('NODE')));
-        
         let hostname = process.env.BASE_URL || 'https://etimadmart.com';
         
         // Force production URL if we're on Railway (production environment)
@@ -19,7 +13,6 @@ const generateSitemap = async (req, res) => {
             hostname = 'https://etimadmart.com';
         }
         
-        console.log('Final hostname:', hostname);
         
         const links = [
                 { url: '/', changefreq: 'daily', priority: 1.0 },
