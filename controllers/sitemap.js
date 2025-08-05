@@ -12,7 +12,13 @@ const generateSitemap = async (req, res) => {
         console.log('NODE_ENV:', process.env.NODE_ENV);
         console.log('All env vars:', Object.keys(process.env).filter(key => key.includes('BASE') || key.includes('NODE')));
         
-        const hostname = process.env.BASE_URL || 'https://etimadmart.com';
+        let hostname = process.env.BASE_URL || 'https://etimadmart.com';
+        
+        // Force production URL if we're on Railway (production environment)
+        if (process.env.PORT === '3600' || process.env.NODE_ENV === 'production') {
+            hostname = 'https://etimadmart.com';
+        }
+        
         console.log('Final hostname:', hostname);
         
         const links = [
