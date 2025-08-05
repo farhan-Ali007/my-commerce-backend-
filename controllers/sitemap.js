@@ -6,6 +6,16 @@ const SubCategory = require('../models/subCategory');
 
 const generateSitemap = async (req, res) => {
     try { 
+        // Always use BASE_URL environment variable, with fallback to production domain
+        // For testing, you can temporarily hardcode: const hostname = 'https://etimadmart.com';
+        const hostname = process.env.BASE_URL || 'https://etimadmart.com';
+        
+        console.log('Generating sitemap with hostname:', hostname);
+        console.log('Environment variables:', {
+            BASE_URL: process.env.BASE_URL,
+            NODE_ENV: process.env.NODE_ENV
+        });
+        
         const links = [
                 { url: '/', changefreq: 'daily', priority: 1.0 },
                 { url: '/shop', changefreq: 'weekly', priority: 0.8 },
@@ -54,11 +64,6 @@ const generateSitemap = async (req, res) => {
             });
         });
 
-        // Use production domain for sitemap URLs
-        const hostname = process.env.NODE_ENV === 'production' 
-            ? 'https://etimadmart.com' 
-            : `${req.protocol}://${req.get('host')}`;
-        
         const sitemapStream = new SitemapStream({ hostname });
 
         // Set the content type header before piping the stream
@@ -73,7 +78,7 @@ const generateSitemap = async (req, res) => {
         }
         sitemapStream.end();
 
-        console.log("Sitemap generation initiated.");
+        console.log(`Sitemap generated successfully with ${links.length} URLs using hostname: ${hostname}`);
 
     } catch (error) {
         console.error("Error generating sitemap:", error);
@@ -84,4 +89,6 @@ const generateSitemap = async (req, res) => {
     }
 };
 
-module.exports =  generateSitemap ;
+
+
+module.exports = { generateSitemap };

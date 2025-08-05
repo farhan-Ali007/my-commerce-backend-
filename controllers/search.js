@@ -12,6 +12,7 @@ const liveSearch = async (req, res) => {
             page = 1, 
             limit = 16,
             categories,
+            subCategories,
             brand,
             rating,
             minPrice,
@@ -23,15 +24,30 @@ const liveSearch = async (req, res) => {
             return res.status(400).json({ message: 'Search query is required.' });
         }
 
-        // Build search query
-        let searchQuery = { $text: { $search: query } };
+        // Build match conditions
+        let matchConditions = {
+            $or: [
+                { title: { $regex: query, $options: 'i' } },
+                { description: { $regex: query, $options: 'i' } },
+                { longDescription: { $regex: query, $options: 'i' } }
+            ]
+        };
         
         // Add category filter
         if (categories && categories.length > 0) {
             const categoryArray = Array.isArray(categories) ? categories : categories.split(',');
             const categoryDocs = await Category.find({ slug: { $in: categoryArray } });
             if (categoryDocs.length > 0) {
-                searchQuery.category = { $in: categoryDocs.map(cat => cat._id) };
+                matchConditions.category = { $in: categoryDocs.map(cat => cat._id) };
+            }
+        }
+
+        // Add subcategory filter
+        if (subCategories && subCategories.length > 0) {
+            const subCategoryArray = Array.isArray(subCategories) ? subCategories : subCategories.split(',');
+            const subCategoryDocs = await Sub.find({ slug: { $in: subCategoryArray } });
+            if (subCategoryDocs.length > 0) {
+                matchConditions.subCategory = { $in: subCategoryDocs.map(sub => sub._id) };
             }
         }
 
@@ -39,66 +55,128 @@ const liveSearch = async (req, res) => {
         if (brand) {
             const brandDoc = await Brand.findOne({ name: brand });
             if (brandDoc) {
-                searchQuery.brand = brandDoc._id;
+                matchConditions.brand = brandDoc._id;
             }
         }
 
         // Add rating filter
         if (rating) {
-            searchQuery.averageRating = { $gte: parseFloat(rating) };
+            matchConditions.averageRating = { $gte: parseFloat(rating) };
         }
 
         // Add price range filter
         if (minPrice || maxPrice) {
-            searchQuery.price = {};
-            if (minPrice) searchQuery.price.$gte = parseFloat(minPrice);
-            if (maxPrice) searchQuery.price.$lte = parseFloat(maxPrice);
+            matchConditions.price = {};
+            if (minPrice) matchConditions.price.$gte = parseFloat(minPrice);
+            if (maxPrice) matchConditions.price.$lte = parseFloat(maxPrice);
         }
 
         // Calculate pagination
         const skip = (parseInt(page) - 1) * parseInt(limit);
         
-        // Get total count
-        const totalProducts = await Product.countDocuments(searchQuery);
-        const totalPages = Math.ceil(totalProducts / parseInt(limit));
+        // Build aggregation pipeline
+        const pipeline = [
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: 'category',
+                    foreignField: '_id',
+                    as: 'categoryData'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'subcategories',
+                    localField: 'subCategory',
+                    foreignField: '_id',
+                    as: 'subCategoryData'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'brands',
+                    localField: 'brand',
+                    foreignField: '_id',
+                    as: 'brandData'
+                }
+            },
+            {
+                $addFields: {
+                    categoryName: { $arrayElemAt: ['$categoryData.name', 0] },
+                    subCategoryName: { $arrayElemAt: ['$subCategoryData.name', 0] },
+                    brandName: { $arrayElemAt: ['$brandData.name', 0] }
+                }
+            },
+            {
+                $match: {
+                    $or: [
+                        // Original product fields
+                        { title: { $regex: query, $options: 'i' } },
+                        { description: { $regex: query, $options: 'i' } },
+                        { longDescription: { $regex: query, $options: 'i' } },
+                        // Category, subcategory, and brand names
+                        { categoryName: { $regex: query, $options: 'i' } },
+                        { subCategoryName: { $regex: query, $options: 'i' } },
+                        { brandName: { $regex: query, $options: 'i' } }
+                    ]
+                }
+            },
+            // Apply additional filters
+            { $match: matchConditions },
+            // Get total count for pagination
+            {
+                $facet: {
+                    metadata: [{ $count: "total" }],
+                    data: [
+                        { $skip: skip },
+                        { $limit: parseInt(limit) }
+                    ]
+                }
+            }
+        ];
 
-        // Build sort object
-        let sortObject = {};
+        // Add sorting
+        let sortStage = {};
         if (sort === 'price_asc') {
-            sortObject = { price: 1 };
+            sortStage = { price: 1 };
         } else if (sort === 'price_desc') {
-            sortObject = { price: -1 };
+            sortStage = { price: -1 };
         } else if (sort === 'newest') {
-            sortObject = { createdAt: -1 };
+            sortStage = { createdAt: -1 };
         } else {
-            // Default: relevance (text score)
-            sortObject = { score: { $meta: "textScore" } };
+            sortStage = { createdAt: -1 };
         }
 
-        const products = await Product.find(
-            searchQuery,
-            { score: { $meta: "textScore" } }
-        )
-            .populate('category', 'name slug')
-            .populate('subCategory', 'name slug')
-            .populate('tags', 'name')
-            .populate('brand', 'name')
-            .populate({
+        // Insert sort stage before pagination
+        const sortIndex = pipeline.findIndex(stage => stage.$facet);
+        pipeline.splice(sortIndex, 0, { $sort: sortStage });
+
+        const results = await Product.aggregate(pipeline);
+
+        const totalProducts = results[0]?.metadata[0]?.total || 0;
+        const totalPages = Math.ceil(totalProducts / parseInt(limit));
+        const products = results[0]?.data || [];
+
+        // Populate additional fields for the products
+        const populatedProducts = await Product.populate(products, [
+            { path: 'category', select: 'name slug' },
+            { path: 'subCategory', select: 'name slug' },
+            { path: 'tags', select: 'name' },
+            { path: 'brand', select: 'name' },
+            {
                 path: 'reviews',
                 select: 'rating reviewText createdAt',
                 populate: {
                     path: 'reviewerId',
                     select: 'username email'
                 }
-            })
-            .sort(sortObject)
-            .skip(skip)
-            .limit(parseInt(limit));
+            }
+        ]);
 
         res.status(200).json({
             success: true,
             message: 'Search results fetched successfully.',
-            products,
+            products: populatedProducts,
             currentPage: parseInt(page),
             totalPages,
             totalProducts
