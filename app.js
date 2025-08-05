@@ -123,10 +123,7 @@ app.use("/api/v1/colorSettings", colorSettingsRouter);
 app.use("/api/v1/popup", popupRouter);
 
 // Register sitemap route BEFORE dynamic page route to avoid conflicts
-app.get("/sitemap.xml", (req, res, next) => {
-    const generateSitemap = require("./controllers/sitemap");
-    generateSitemap(req, res, next);
-});
+app.use("/", sitemapRoute);
 app.use("/api/v1/page", dynamicPageRouter);
 app.use("/", productFeedRouter);
 
