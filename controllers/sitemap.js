@@ -6,15 +6,8 @@ const SubCategory = require('../models/subCategory');
 
 const generateSitemap = async (req, res) => {
     try { 
-        // Always use BASE_URL environment variable, with fallback to production domain
-        // For testing, you can temporarily hardcode: const hostname = 'https://etimadmart.com';
+        // Use BASE_URL environment variable, with fallback to production domain
         const hostname = process.env.BASE_URL || 'https://etimadmart.com';
-        
-        console.log('Generating sitemap with hostname:', hostname);
-        console.log('Environment variables:', {
-            BASE_URL: process.env.BASE_URL,
-            NODE_ENV: process.env.NODE_ENV
-        });
         
         const links = [
                 { url: '/', changefreq: 'daily', priority: 1.0 },
@@ -78,7 +71,7 @@ const generateSitemap = async (req, res) => {
         }
         sitemapStream.end();
 
-        console.log(`Sitemap generated successfully with ${links.length} URLs using hostname: ${hostname}`);
+
 
     } catch (error) {
         console.error("Error generating sitemap:", error);
