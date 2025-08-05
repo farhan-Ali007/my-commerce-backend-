@@ -7,22 +7,7 @@ const SubCategory = require('../models/subCategory');
 const generateSitemap = async (req, res) => {
     try { 
         // Use BASE_URL environment variable, with fallback to production domain
-        console.log('=== PRODUCTION DEBUG ===');
-        console.log('BASE_URL from env:', process.env.BASE_URL);
-        console.log('NODE_ENV:', process.env.NODE_ENV);
-        
-        let hostname = process.env.BASE_URL;
-        
-        if (!hostname) {
-            console.log('BASE_URL not found, using fallback');
-            hostname = 'https://etimadmart.com';
-        }
-        
-        // Determine hostname based on environment
-        if (process.env.NODE_ENV === 'production' || !hostname) {
-            hostname = 'https://etimadmart.com';
-        }
-        console.log('Final hostname:', hostname);
+        const hostname = process.env.BASE_URL || 'https://etimadmart.com';
         
         const links = [
                 { url: '/', changefreq: 'daily', priority: 1.0 },
