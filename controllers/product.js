@@ -1,5 +1,5 @@
 const Product = require('../models/product');
-const { uploadImage } = require('../config/cloudinary');
+const { uploadImage , deleteImage } = require('../config/cloudinary');
 const Category = require('../models/category');
 const Brand = require('../models/brand');
 const cloudinary = require('cloudinary').v2
@@ -9,7 +9,7 @@ const slugify = require('slugify');
 const SubCategory = require('../models/subCategory.js');
 const Redirect = require('../models/redirect'); // Centralized Redirect model
 
-const frontendBase = process.env.BASE_URL || 'http://localhost:5173'; // Set this in production
+const frontendBase = process.env.BASE_URL || 'http://localhost:5173'; 
 
 const generateSlug = (title, providedSlug) => {
     if (providedSlug !== undefined && providedSlug !== null && providedSlug !== "") {
@@ -21,6 +21,7 @@ const generateSlug = (title, providedSlug) => {
         return slugify(String(title), { lower: true, strict: true });
     }
 };
+
 
 const createProduct = async (req, res) => {
     try {
@@ -164,11 +165,12 @@ const processTags = async (tagsArray) => {
     return tagIds;
 };
 
+// Update uploadImages to return array of { url, public_id }
 const uploadImages = async (images) => {
     const uploadedImages = [];
     for (const file of images) {
         const uploadedImage = await uploadImage(file);
-        uploadedImages.push(uploadedImage.url);
+        uploadedImages.push({ url: uploadedImage.url, public_id: uploadedImage.public_id });
     }
     return uploadedImages;
 };
@@ -337,14 +339,14 @@ const updateProduct = async (req, res) => {
         // Handling the images update
         let updatedImages = [];
         if (existingImages) {
-            updatedImages = [...JSON.parse(existingImages)];  // Spread existing images into the array
+            // Parse and preserve existing images (now objects)
+            updatedImages = [...JSON.parse(existingImages)];
         }
-
         if (req.files?.images && req.files.images.length > 0) {
             // Append the new images to the existing ones
             for (const file of req.files.images) {
                 const myImage = await uploadImage(file);
-                updatedImages.push(myImage.url);  // Add new image to the array
+                updatedImages.push({ url: myImage.url, public_id: myImage.public_id });
             }
         }
 
@@ -582,11 +584,10 @@ const deleteProduct = async (req, res) => {
         // Optionally, add redirects for any old slugs (if you were tracking them elsewhere)
 
         if (product.images && product.images.length > 0) {
-            for (const imageUrl of product.images) {
-                // Extract public_id from the image URL
-                const publicId = imageUrl.split('/').slice(-2).join('/').split('.')[0];
-                // console.log("Public ids of images------>" , publicId)
-                await cloudinary.uploader.destroy(publicId);
+            for (const imageObj of product.images) {
+                if (imageObj.public_id) {
+                    await deleteImage(imageObj.public_id);
+                }
             }
         }
 

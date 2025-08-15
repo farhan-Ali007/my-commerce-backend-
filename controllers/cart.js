@@ -45,6 +45,7 @@ const addItemToCart = async (req, res) => {
             count: item.count,
             price: item.price,
             selectedVariants: item.selectedVariants || [],
+            image: item.image, // <-- store the image
         }));
 
         const cartTotal = formattedProducts.reduce((total, item) => total + item.count * item.price, 0);

@@ -38,6 +38,13 @@ const orderSchema = new mongoose.Schema({
         enum: ['Pending', 'Shipped', 'Delivered', 'Cancelled'],
         default: 'Pending',
     },
+    // Order source: which client placed it
+    source: {
+        type: String,
+        enum: ['web', 'mobile', 'unknown'],
+        default: 'unknown',
+        index: true,
+    },
     orderedAt: { type: Date, default: Date.now },
 });
 
