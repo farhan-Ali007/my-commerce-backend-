@@ -19,6 +19,10 @@ const cartSchema = new mongoose.Schema(
                     required: true,
                     min: 0,
                 },
+                image: {
+                    type: String,
+                    required: false,
+                },
                 selectedVariants: [
                     {
                         name: {

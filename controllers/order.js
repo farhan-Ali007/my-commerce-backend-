@@ -66,6 +66,19 @@ const creatOrder = async (req, res) => {
       return res.status(400).json({ error: "Failed to update all products" });
     }
 
+    // Determine order source (web/mobile/unknown)
+    const clientHeader = (req.get("X-Client") || "").toLowerCase();
+    let source = "unknown";
+    if (clientHeader === "mobile") source = "mobile";
+    else if (clientHeader === "web") source = "web";
+    else {
+      const ua = (req.get("User-Agent") || "").toLowerCase();
+      // Simple UA heuristic fallback
+      if (ua.includes("mozilla") || ua.includes("chrome") || ua.includes("safari")) {
+        source = "web";
+      }
+    }
+
     // Create a new order
     const newOrder = new Order({
       orderedBy: isGuest ? null : userId,
@@ -75,6 +88,7 @@ const creatOrder = async (req, res) => {
       totalPrice,
       freeShipping,
       deliveryCharges,
+      source,
     });
 
     const savedOrder = await newOrder.save();
@@ -117,7 +131,7 @@ const creatOrder = async (req, res) => {
           admin._id,
           "admin_order",
           "New Order Received!",
-          `New order #${savedOrder._id}\nfrom ${customerName} - Total: $${totalPrice}`,
+          `New order #${savedOrder._id}\nfrom ${customerName} - Total: Rs.${totalPrice}`,
           savedOrder._id,
           {
             orderId: savedOrder._id,
@@ -137,31 +151,54 @@ const creatOrder = async (req, res) => {
       try {
         // Get product details for email
         const productIds = cartSummary.map((item) => item.productId);
-        
+
         const products = await Product.find({
           _id: { $in: productIds },
-        }).select("title slug price");
+        }).select("title slug price salePrice images");
 
-        // Map cart items with product details
+        // Build a lookup map for robust matching
+        const productMap = new Map(products.map((p) => [p._id.toString(), p]));
+
+        // Map cart items with product details (title, slug, image, price/salePrice)
         const productsWithDetails = cartSummary.map((item) => {
-          const product = products.find(
-            (p) => p._id.toString() === item.productId
+          // Determine product id key robustly (supports productId, product, _id, nested)
+          const rawId = item?.productId ?? item?.product ?? item?._id ?? item?.product?._id;
+          const key = rawId && rawId.toString ? rawId.toString() : String(rawId);
+          const product = productMap.get(key);
+
+          // Derive first image URL from either string or object form
+          let firstImageUrl = null;
+          if (Array.isArray(product?.images) && product.images.length > 0) {
+            const first = product.images[0];
+            firstImageUrl = typeof first === 'string' ? first : (first?.url || null);
+          }
+
+          const title = item?.title ?? product?.title ?? "Unknown Product";
+          const imageUrl = item?.image ?? firstImageUrl;
+          const salePrice = Number(
+            (item?.price != null ? item.price : (product?.salePrice ?? product?.price ?? 0))
           );
+          const price = Number(product?.price ?? item?.price ?? salePrice ?? 0);
+
           return {
             ...item,
-            title: product?.title || "Unknown Product",
+            title,
             slug: product?.slug || "product",
-            price: product?.price || 0,
+            price,
+            salePrice,
+            count: Number(item?.count ?? 1),
+            imageUrl,
           };
         });
 
         const adminEmail = process.env.ADMIN_EMAIL || "info@etimadmart.com";
 
-        await sendOrderEmailToAdmin({
+      const result = await sendOrderEmailToAdmin({
           order: savedOrder,
           products: productsWithDetails,
           adminEmail: adminEmail,
         });
+        console.log("Email sent to admin:", result);
       } catch (emailError) {
         console.error("Error sending order email to admin:", emailError);
         // Don't fail the order creation if email fails
@@ -217,7 +254,7 @@ const getMyOrders = async (req, res) => {
       .sort({ orderedAt: -1 });
 
     res.status(200).json({ orders });
-    console.log("My orders------->", orders);
+    // console.log("My orders------->", orders);
   } catch (error) {
     console.error("Error fetching my orders:", error);
     res.status(500).json({ error: "Failed to fetch orders" });

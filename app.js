@@ -27,6 +27,9 @@ const dynamicPageRouter = require("./routes/dynamicPage");
 const notificationRouter = require("./routes/notification.js");
 const colorSettingsRouter = require("./routes/colorSettings.js");
 const popupRouter = require("./routes/popup.js");
+const chatbotRouter = require("./routes/chatbot.js");
+const logoRouter = require("./routes/logo.js");
+const analyticsRouter = require("./routes/analytics.js");
 
 dotenv.config();
 const app = express();
@@ -127,6 +130,9 @@ app.use("/api/v1/footer", footerRouter);
 app.use("/api/v1/notification", notificationRouter);
 app.use("/api/v1/colorSettings", colorSettingsRouter);
 app.use("/api/v1/popup", popupRouter);
+app.use("/api/v1/chatbot", chatbotRouter);
+app.use("/api/v1/logo", logoRouter);
+app.use("/api/v1/analytics", analyticsRouter);
 
 // Register sitemap route BEFORE dynamic page route to avoid conflicts
 app.use("/", sitemapRoute);
