@@ -3,6 +3,7 @@ const Product = require("../models/product");
 const { v4: uuidv4 } = require("uuid");
 const { createNotification } = require("./notification");
 const { sendOrderEmailToAdmin } = require("../utils/mailer");
+const User = require("../models/user");
 
 const creatOrder = async (req, res) => {
   try {
@@ -74,7 +75,11 @@ const creatOrder = async (req, res) => {
     else {
       const ua = (req.get("User-Agent") || "").toLowerCase();
       // Simple UA heuristic fallback
-      if (ua.includes("mozilla") || ua.includes("chrome") || ua.includes("safari")) {
+      if (
+        ua.includes("mozilla") ||
+        ua.includes("chrome") ||
+        ua.includes("safari")
+      ) {
         source = "web";
       }
     }
@@ -92,6 +97,9 @@ const creatOrder = async (req, res) => {
     });
 
     const savedOrder = await newOrder.save();
+    res
+      .status(201)
+      .json({ message: "Order placed successfully!", order: savedOrder });
 
     // Create notification for order placement (only for registered users)
     if (!isGuest && userId) {
@@ -112,7 +120,6 @@ const creatOrder = async (req, res) => {
 
     // Create notifications for all admin users
     try {
-      const User = require("../models/user");
       const adminUsers = await User.find({ role: "admin" });
 
       // Get customer details for admin notification
@@ -162,21 +169,26 @@ const creatOrder = async (req, res) => {
         // Map cart items with product details (title, slug, image, price/salePrice)
         const productsWithDetails = cartSummary.map((item) => {
           // Determine product id key robustly (supports productId, product, _id, nested)
-          const rawId = item?.productId ?? item?.product ?? item?._id ?? item?.product?._id;
-          const key = rawId && rawId.toString ? rawId.toString() : String(rawId);
+          const rawId =
+            item?.productId ?? item?.product ?? item?._id ?? item?.product?._id;
+          const key =
+            rawId && rawId.toString ? rawId.toString() : String(rawId);
           const product = productMap.get(key);
 
           // Derive first image URL from either string or object form
           let firstImageUrl = null;
           if (Array.isArray(product?.images) && product.images.length > 0) {
             const first = product.images[0];
-            firstImageUrl = typeof first === 'string' ? first : (first?.url || null);
+            firstImageUrl =
+              typeof first === "string" ? first : first?.url || null;
           }
 
           const title = item?.title ?? product?.title ?? "Unknown Product";
           const imageUrl = item?.image ?? firstImageUrl;
           const salePrice = Number(
-            (item?.price != null ? item.price : (product?.salePrice ?? product?.price ?? 0))
+            item?.price != null
+              ? item.price
+              : product?.salePrice ?? product?.price ?? 0
           );
           const price = Number(product?.price ?? item?.price ?? salePrice ?? 0);
 
@@ -193,7 +205,7 @@ const creatOrder = async (req, res) => {
 
         const adminEmail = process.env.ADMIN_EMAIL || "info@etimadmart.com";
 
-      const result = await sendOrderEmailToAdmin({
+        const result = await sendOrderEmailToAdmin({
           order: savedOrder,
           products: productsWithDetails,
           adminEmail: adminEmail,
@@ -210,10 +222,6 @@ const creatOrder = async (req, res) => {
       );
       // Don't fail the order creation if admin notifications fail
     }
-
-    res
-      .status(201)
-      .json({ message: "Order placed successfully!", order: savedOrder });
   } catch (error) {
     console.error("Error creating order:", error);
     res.status(500).json({
