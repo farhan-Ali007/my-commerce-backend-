@@ -86,9 +86,20 @@ app.use(
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "X-Client",
+      "Accept",
+      "Origin",
+      "Cookie"
+    ],
   })
 );
+
+// Ensure preflight requests are handled properly
+app.options("*", cors());
 
 // Body parsing middleware
 app.use(cookieParser());
