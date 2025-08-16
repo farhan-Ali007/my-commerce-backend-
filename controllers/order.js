@@ -383,10 +383,230 @@ const getRecentOrders = async (req, res) => {
     });
   }
 };
+
+// Live search and sorting for orders (admin)
+// Query params:
+// q: search term (matches shippingAddress.fullName, shippingAddress.mobile, orderedBy.username, orderedBy.mobile)
+// status: filter by order status (Pending|Shipped|Delivered|Cancelled)
+// sortBy: 'status' | 'orderedAt' (default 'orderedAt')
+// sortOrder: 'asc' | 'desc' (default 'desc' for orderedAt, 'asc' for status)
+// page, limit: pagination
+const searchOrders = async (req, res) => {
+  try {
+    const {
+      q = "",
+      status,
+      sortBy = "orderedAt",
+      sortOrder,
+    } = req.query;
+
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+
+    // Build dynamic aggregation
+    const matchStage = {};
+    if (status) {
+      matchStage.status = status;
+    }
+
+    // Default sort
+    let sortStage = {};
+    if (sortBy === "status") {
+      // Custom sort order for status
+      const orderDir = (sortOrder || "asc").toLowerCase() === "desc" ? -1 : 1;
+      sortStage = { statusOrder: orderDir, orderedAt: -1 };
+    } else {
+      const orderDir = (sortOrder || "desc").toLowerCase() === "asc" ? 1 : -1;
+      sortStage = { orderedAt: orderDir };
+    }
+
+    const pipeline = [
+      // Join user for searching by username/mobile
+      {
+        $lookup: {
+          from: "users",
+          localField: "orderedBy",
+          foreignField: "_id",
+          as: "orderedByUser",
+        },
+      },
+      { $unwind: { path: "$orderedByUser", preserveNullAndEmptyArrays: true } },
+      // Status filter (if any)
+      { $match: matchStage },
+      // Add status order for custom sorting
+      {
+        $addFields: {
+          statusOrder: {
+            $switch: {
+              branches: [
+                { case: { $eq: ["$status", "Pending"] }, then: 1 },
+                { case: { $eq: ["$status", "Shipped"] }, then: 2 },
+                { case: { $eq: ["$status", "Delivered"] }, then: 3 },
+                { case: { $eq: ["$status", "Cancelled"] }, then: 4 },
+              ],
+              default: 99,
+            },
+          },
+        },
+      },
+    ];
+
+    // Text search (case-insensitive) on name/mobile (shipping address and user)
+    const trimmedQ = String(q).trim();
+    if (trimmedQ) {
+      const regex = new RegExp(trimmedQ.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      pipeline.push({
+        $match: {
+          $or: [
+            { "shippingAddress.fullName": { $regex: regex } },
+            { "shippingAddress.mobile": { $regex: regex } },
+            { "orderedByUser.username": { $regex: regex } },
+            { "orderedByUser.mobile": { $regex: regex } },
+          ],
+        },
+      });
+    }
+
+    pipeline.push(
+      { $sort: sortStage },
+      {
+        $facet: {
+          data: [
+            { $skip: skip },
+            { $limit: limit },
+            // Project minimal fields plus user preview
+            {
+              $project: {
+                orderedBy: 1,
+                guestId: 1,
+                shippingAddress: 1,
+                cartSummary: 1,
+                deliveryCharges: 1,
+                freeShipping: 1,
+                totalPrice: 1,
+                status: 1,
+                source: 1,
+                orderedAt: 1,
+                orderedByPreview: {
+                  _id: "$orderedByUser._id",
+                  username: "$orderedByUser.username",
+                  mobile: "$orderedByUser.mobile",
+                  streetAddress: "$orderedByUser.streetAddress",
+                },
+              },
+            },
+          ],
+          totalCount: [{ $count: "count" }],
+        },
+      }
+    );
+
+    const aggResult = await Order.aggregate(pipeline);
+    const data = aggResult?.[0]?.data || [];
+    const total = aggResult?.[0]?.totalCount?.[0]?.count || 0;
+
+    // Optionally populate product titles like getAllOrders
+    // We'll re-fetch by ids to leverage existing populate logic while preserving pagination order
+    const idsInOrder = data.map((d) => d._id);
+    let populatedOrders = [];
+    if (idsInOrder.length) {
+      const found = await Order.find({ _id: { $in: idsInOrder } })
+        .populate("cartSummary.product", "title price")
+        .populate("orderedBy", "username mobile streetAddress");
+      const map = new Map(found.map((o) => [String(o._id), o]));
+      populatedOrders = idsInOrder.map((id) => map.get(String(id))).filter(Boolean);
+    }
+
+    res.status(200).json({
+      success: true,
+      orders: populatedOrders,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (error) {
+    console.error("Error searching orders:", error);
+    res.status(500).json({ message: "Failed to search orders" });
+  }
+};
+
+// Sort orders by status (admin)
+// Query params:
+// status: optional exact status to filter (Pending|Shipped|Delivered|Cancelled)
+// order: 'asc' (Pending→Cancelled) or 'desc' (Cancelled→Pending). Default 'asc'
+// page, limit: pagination
+const sortOrdersByStatus = async (req, res) => {
+  try {
+    const { status, order = "asc" } = req.query;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+
+    const matchStage = {};
+    if (status) matchStage.status = status;
+
+    const direction = String(order).toLowerCase() === "desc" ? -1 : 1;
+
+    const pipeline = [
+      { $match: matchStage },
+      {
+        $addFields: {
+          statusOrder: {
+            $switch: {
+              branches: [
+                { case: { $eq: ["$status", "Pending"] }, then: 1 },
+                { case: { $eq: ["$status", "Shipped"] }, then: 2 },
+                { case: { $eq: ["$status", "Delivered"] }, then: 3 },
+                { case: { $eq: ["$status", "Cancelled"] }, then: 4 },
+              ],
+              default: 99,
+            },
+          },
+        },
+      },
+      { $sort: { statusOrder: direction, orderedAt: -1 } },
+      {
+        $facet: {
+          data: [ { $skip: skip }, { $limit: limit } ],
+          totalCount: [ { $count: "count" } ]
+        }
+      }
+    ];
+
+    const agg = await Order.aggregate(pipeline);
+    const data = agg?.[0]?.data || [];
+    const total = agg?.[0]?.totalCount?.[0]?.count || 0;
+
+    // Populate to match other responses
+    const ids = data.map((d) => d._id);
+    let orders = [];
+    if (ids.length) {
+      const found = await Order.find({ _id: { $in: ids } })
+        .populate("cartSummary.product", "title price")
+        .populate("orderedBy", "username mobile streetAddress");
+      const map = new Map(found.map((o) => [String(o._id), o]));
+      orders = ids.map((id) => map.get(String(id))).filter(Boolean);
+    }
+
+    res.status(200).json({
+      success: true,
+      orders,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (error) {
+    console.error("Error sorting orders by status:", error);
+    res.status(500).json({ message: "Failed to sort orders by status" });
+  }
+};
 module.exports = {
   creatOrder,
   getMyOrders,
   updateOrderStatus,
   getAllOrders,
   getRecentOrders,
+  searchOrders,
+  sortOrdersByStatus,
 };

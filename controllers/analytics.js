@@ -39,13 +39,22 @@ const buildOrdersTimeSeries = async ({ from, to, interval = 'day' }) => {
         _id: { dateKey: '$dateKey', orderId: '$_id' },
         itemsSold: { $sum: '$cartSummary.count' },
         totalPrice: { $first: '$totalPrice' },
+        status: { $first: '$status' },
       },
     },
     {
       $group: {
         _id: '$_id.dateKey',
         orders: { $sum: 1 },
-        revenue: { $sum: '$totalPrice' },
+        revenue: {
+          $sum: {
+            $cond: [
+              { $eq: ['$status', 'Cancelled'] },
+              0,
+              '$totalPrice',
+            ],
+          },
+        },
         itemsSold: { $sum: '$itemsSold' },
       },
     },
@@ -77,13 +86,22 @@ const kpiForRange = async ({ start, end }) => {
         _id: '$_id',
         itemsSold: { $sum: '$cartSummary.count' },
         totalPrice: { $first: '$totalPrice' },
+        status: { $first: '$status' },
       },
     },
     {
       $group: {
         _id: null,
         orders: { $sum: 1 },
-        revenue: { $sum: '$totalPrice' },
+        revenue: {
+          $sum: {
+            $cond: [
+              { $eq: ['$status', 'Cancelled'] },
+              0,
+              '$totalPrice',
+            ],
+          },
+        },
         itemsSold: { $sum: '$itemsSold' },
       },
     },
@@ -102,13 +120,22 @@ const kpiAllTime = async () => {
         _id: '$_id',
         itemsSold: { $sum: '$cartSummary.count' },
         totalPrice: { $first: '$totalPrice' },
+        status: { $first: '$status' },
       },
     },
     {
       $group: {
         _id: null,
         orders: { $sum: 1 },
-        revenue: { $sum: '$totalPrice' },
+        revenue: {
+          $sum: {
+            $cond: [
+              { $eq: ['$status', 'Cancelled'] },
+              0,
+              '$totalPrice',
+            ],
+          },
+        },
         itemsSold: { $sum: '$itemsSold' },
       },
     },

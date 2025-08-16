@@ -3,6 +3,7 @@ const Cart = require('../models/cart');
 const { v4: uuidv4 } = require('uuid')
 
 const addItemToCart = async (req, res) => {
+
     const { cart } = req.body;
     let userId = req.body.userId;
     const isGuest = !userId;
@@ -24,6 +25,13 @@ const addItemToCart = async (req, res) => {
     }
 
     try {
+        const normalizeImage = (img) => {
+            if (!img) return "";
+            if (typeof img === 'string') return img;
+            if (typeof img === 'object') return img.url || img.secure_url || "";
+            return "";
+        };
+
         let userCart;
 
         if (isGuest) {
@@ -45,7 +53,7 @@ const addItemToCart = async (req, res) => {
             count: item.count,
             price: item.price,
             selectedVariants: item.selectedVariants || [],
-            image: item.image, // <-- store the image
+            image: normalizeImage(item.image), // ensure image is a string URL
         }));
 
         const cartTotal = formattedProducts.reduce((total, item) => total + item.count * item.price, 0);
