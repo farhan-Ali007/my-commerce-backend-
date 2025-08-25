@@ -469,11 +469,16 @@ const updateProduct = async (req, res) => {
 
 const getAllProducts = async (req, res) => {
     try {
-        const { page = 1, limit = 8 } = req.query;
-
-        const skip = (page - 1) * limit;
+        // Convert page and limit to numbers and provide defaults
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 8;
+        
+        // Ensure limit is at least 1 and not too high
+        const safeLimit = Math.min(Math.max(1, limit), 50);
+        
+        const skip = (page - 1) * safeLimit;
         const totalProducts = await Product.countDocuments();
-        const totalPages = Math.ceil(totalProducts / limit);
+        const totalPages = Math.ceil(totalProducts / safeLimit);
 
         const products = await Product.find({})
             .populate('category', 'name slug')
@@ -489,7 +494,7 @@ const getAllProducts = async (req, res) => {
             })
             .skip(skip)
             .sort([['updatedAt', 'desc'], ['createdAt', 'desc']])
-            .limit(limit);
+            .limit(safeLimit);
 
         // Calculate average rating for each product and add it to the product object
         products.forEach(product => {
@@ -716,7 +721,7 @@ const getBestSellers = async (req, res) => {
             })
             .skip(skip)
             .sort([['updatedAt', 'desc'], ['createdAt', 'desc']])
-            .limit(limit);
+            .limit(safeLimit);
 
         // Calculate average rating for each product
         products.forEach(product => {
@@ -787,8 +792,14 @@ const getProductsBySubCategory = async (req, res) => {
 
 const getFeaturedProducts = async (req, res) => {
     try {
-        const { page = 1, limit = 8 } = req.query;
-        const skip = (page - 1) * limit;
+        // Convert page and limit to numbers and provide defaults
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 8;
+        
+        // Ensure limit is at least 1 and not too high
+        const safeLimit = Math.min(Math.max(1, limit), 50);
+        
+        const skip = (page - 1) * safeLimit;
 
         // Find the 'featured' tag (case-insensitive for robustness)
         const featuredTag = await Tag.findOne({ name: /^featured$/i });
@@ -807,7 +818,7 @@ const getFeaturedProducts = async (req, res) => {
         const totalProducts = await Product.countDocuments({
             tags: { $in: [featuredTag._id] }
         });
-        const totalPages = Math.ceil(totalProducts / limit);
+        const totalPages = Math.ceil(totalProducts / safeLimit);
 
         const products = await Product.find({ tags: { $in: [featuredTag._id] } })
             .populate('category', 'name slug')
@@ -823,7 +834,7 @@ const getFeaturedProducts = async (req, res) => {
             })
             .skip(skip)
             .sort([['updatedAt', 'desc'], ['createdAt', 'desc']])
-            .limit(limit);
+            .limit(safeLimit);
 
         // Calculate average rating for each product
         products.forEach(product => {
