@@ -686,8 +686,11 @@ const getRelatedProducts = async (req, res) => {
 
 const getBestSellers = async (req, res) => {
     try {
-        const { page = 1, limit = 4 } = req.query;
-        const skip = (page - 1) * limit;
+        // Safely parse pagination params
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 4;
+        const safeLimit = Math.min(Math.max(1, limit), 50);
+        const skip = (page - 1) * safeLimit;
 
         // Find the 'best seller' tag (case-insensitive)
         const bestSellerTag = await Tag.findOne({ name: /^best seller$/i });
@@ -705,7 +708,7 @@ const getBestSellers = async (req, res) => {
         const totalProducts = await Product.countDocuments({
             tags: { $in: [bestSellerTag._id] }
         });
-        const totalPages = Math.ceil(totalProducts / limit);
+        const totalPages = Math.ceil(totalProducts / safeLimit);
 
         const products = await Product.find({ tags: { $in: [bestSellerTag._id] } })
             .populate('category', 'name slug')
