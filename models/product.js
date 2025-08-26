@@ -144,6 +144,18 @@ const productSchema = new mongoose.Schema({
         ref: 'User',
         required: true,
     },
+    // Volume pricing tiers
+    volumeTierEnabled: {
+        type: Boolean,
+        default: false,
+    },
+    volumeTiers: [
+        new mongoose.Schema({
+            quantity: { type: Number, required: true, min: 1 },
+            price: { type: Number, required: true, min: 0 },
+            image: { type: String, default: null },
+        }, { _id: false })
+    ],
 }, {
     timestamps: true,
 });

@@ -22,6 +22,26 @@ const generateSlug = (title, providedSlug) => {
     }
 };
 
+// Process volume tiers: expects array of { quantity, price, imageIndex? }
+const processVolumeTiers = async (tiers = [], tierImages) => {
+    const processed = [];
+    for (let i = 0; i < tiers.length; i++) {
+        const t = tiers[i];
+        const idx = t.imageIndex !== undefined && t.imageIndex !== null ? Number(t.imageIndex) : null;
+        let imageUrl = null;
+        if (tierImages && idx !== null && tierImages[idx]) {
+            const uploaded = await uploadImage(tierImages[idx]);
+            imageUrl = uploaded.url;
+        }
+        processed.push({
+            quantity: Number(t.quantity),
+            price: Number(t.price),
+            ...(imageUrl ? { image: imageUrl } : {}),
+        });
+    }
+    return processed;
+};
+
 
 const createProduct = async (req, res) => {
     try {
@@ -41,7 +61,9 @@ const createProduct = async (req, res) => {
             tags,
             slug,
             imageAlts,
-            metaDescription
+            metaDescription,
+            volumeTierEnabled,
+            volumeTiers
         } = req.body;
 
         console.log("Coming data----->", req.body)
@@ -58,6 +80,16 @@ const createProduct = async (req, res) => {
             parsedVariants = JSON.parse(variants);
         } catch (error) {
             return res.status(400).json({ message: "Invalid variant data format." });
+        }
+
+        // Parse volume tiers (optional)
+        let parsedVolumeTiers = [];
+        if (volumeTiers) {
+            try {
+                parsedVolumeTiers = JSON.parse(volumeTiers);
+            } catch (error) {
+                return res.status(400).json({ message: "Invalid volume tiers data format." });
+            }
         }
 
         console.log("Parsed varianst----->", parsedVariants)
@@ -91,8 +123,12 @@ const createProduct = async (req, res) => {
         // Process variants
         const uploadedVariants = await processVariants(parsedVariants, req.files.variantImages);
 
+        // Process volume tiers
+        const uploadedVolumeTiers = await processVolumeTiers(parsedVolumeTiers, req.files?.volumeTierImages);
+
         // **Handle Free Shipping & Delivery Charges**
         const isFreeShipping = freeShipping === 'true' || freeShipping === true;
+        const isVolumeTierEnabled = volumeTierEnabled === 'true' || volumeTierEnabled === true;
         const deliveryCharges = isFreeShipping ? 0 : 250;
         // Create product
         const currentUserId = req.user.id;
@@ -112,6 +148,8 @@ const createProduct = async (req, res) => {
             brand: brandDoc._id || null,
             tags: tagIds,
             variants: uploadedVariants,
+            volumeTierEnabled: isVolumeTierEnabled,
+            volumeTiers: uploadedVolumeTiers,
             images: uploadedImages,
             freeShipping: isFreeShipping,
             deliveryCharges,
@@ -246,6 +284,8 @@ const updateProduct = async (req, res) => {
             specialOfferPrice,
             specialOfferStart,
             specialOfferEnd,
+            volumeTierEnabled,
+            volumeTiers,
         } = req.body;
 
         console.log("category from frontend:", category, "subCategory from frontend:", subCategory);
@@ -258,6 +298,7 @@ const updateProduct = async (req, res) => {
         if (!product) return res.status(404).json({ message: "Product not found." });
 
         const parsedVariants = variants ? JSON.parse(variants) : null;
+        const parsedVolumeTiers = volumeTiers ? JSON.parse(volumeTiers) : null;
 
         if (title !== undefined) {
             product.title = title;
@@ -405,6 +446,34 @@ const updateProduct = async (req, res) => {
             updatedVariants = [...product.variants];
         }
 
+        // --- VOLUME TIERS IMAGE HANDLING (preserve existing images) ---
+        let updatedVolumeTiers = [];
+        if (parsedVolumeTiers) {
+            // If new images are sent as an array aligned by imageIndex
+            const tierImages = req.files?.volumeTierImages || null;
+            updatedVolumeTiers = [];
+            for (let i = 0; i < parsedVolumeTiers.length; i++) {
+                const t = parsedVolumeTiers[i];
+                let imageUrl = t.image || null;
+                const idx = t.imageIndex !== undefined && t.imageIndex !== null ? Number(t.imageIndex) : null;
+                if (tierImages && idx !== null && tierImages[idx]) {
+                    const uploaded = await uploadImage(tierImages[idx]);
+                    imageUrl = uploaded.url;
+                } else if (!imageUrl && Array.isArray(product.volumeTiers)) {
+                    // Try to preserve from existing by matching quantity and price
+                    const existing = product.volumeTiers.find(et => Number(et.quantity) === Number(t.quantity) && Number(et.price) === Number(t.price));
+                    if (existing && existing.image) imageUrl = existing.image;
+                }
+                updatedVolumeTiers.push({
+                    quantity: Number(t.quantity),
+                    price: Number(t.price),
+                    ...(imageUrl ? { image: imageUrl } : {}),
+                });
+            }
+        } else {
+            updatedVolumeTiers = Array.isArray(product.volumeTiers) ? [...product.volumeTiers] : [];
+        }
+
         // Handle the deletion of variants (if any)
         if (req.body.deleteVariants) {
             const variantsToDelete = req.body.deleteVariants.split(',');
@@ -418,6 +487,11 @@ const updateProduct = async (req, res) => {
             const isFreeShipping = req.body.freeShipping === 'true' || req.body.freeShipping === true;
             product.freeShipping = isFreeShipping;
             product.deliveryCharges = isFreeShipping ? 0 : 250;
+        }
+
+        // Update volume tier enabled flag
+        if (volumeTierEnabled !== undefined) {
+            product.volumeTierEnabled = volumeTierEnabled === 'true' || volumeTierEnabled === true;
         }
 
         // Update special offer fields if provided
@@ -451,6 +525,7 @@ const updateProduct = async (req, res) => {
         product.tags = tagIds.length > 0 ? tagIds : product.tags;
         product.images = updatedImages;
         product.variants = updatedVariants;
+        product.volumeTiers = updatedVolumeTiers;
         product.metaDescription = metaDescription || product.metaDescription;
 
         await product.save();

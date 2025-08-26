@@ -20,13 +20,15 @@ const recordVisit = async (req, res) => {
     const visitorIdHash = visitorId ? hash(String(visitorId)) : '';
 
     // Prefer visitorId-based dedupe when present; otherwise fallback to IP+UA
+    // IMPORTANT: De-dupe per device per day (global), not per path.
     const filter = visitorIdHash
-      ? { visitorIdHash, path, dateKey: today }
-      : { ipHash: hash(ip), uaHash: hash(ua), path, dateKey: today };
+      ? { visitorIdHash, dateKey: today }
+      : { ipHash: hash(ip), uaHash: hash(ua), dateKey: today };
 
     const doc = await SiteVisit.findOneAndUpdate(
       filter,
-      { $setOnInsert: { referer } },
+      // Keep the first referer/path of the day only on insert
+      { $setOnInsert: { referer, path } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 

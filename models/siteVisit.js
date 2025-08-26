@@ -12,13 +12,20 @@ const SiteVisitSchema = new mongoose.Schema(
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
-// De-duplicate per IP+UA+path per day
+// Legacy: De-duplicate per IP+UA+path per day (kept for backward compatibility)
 SiteVisitSchema.index({ ipHash: 1, uaHash: 1, path: 1, dateKey: 1 }, { unique: true });
 
-// Also de-duplicate per visitorId+path per day when visitorId is present
+// Legacy: De-duplicate per visitorId+path per day (partial)
 SiteVisitSchema.index(
   { visitorIdHash: 1, path: 1, dateKey: 1 },
   { unique: true, partialFilterExpression: { visitorIdHash: { $type: 'string' } } }
+);
+
+// New: Enforce one visit per device per day globally (not per path)
+SiteVisitSchema.index({ ipHash: 1, uaHash: 1, dateKey: 1 }, { unique: true, sparse: true });
+SiteVisitSchema.index(
+  { visitorIdHash: 1, dateKey: 1 },
+  { unique: true, sparse: true, partialFilterExpression: { visitorIdHash: { $type: 'string' } } }
 );
 
 module.exports = mongoose.model('SiteVisit', SiteVisitSchema);
