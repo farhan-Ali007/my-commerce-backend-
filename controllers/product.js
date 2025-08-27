@@ -193,10 +193,6 @@ const processTags = async (tagsArray) => {
         const tagNameLower = tagName.toLowerCase();
         let tag = await Tag.findOne({ name: tagNameLower });
 
-        if (!tag) {
-            tag = new Tag({ name: tagNameLower });
-            await tag.save();
-        }
 
         tagIds.push(tag._id);
     }

@@ -24,21 +24,27 @@ const liveSearch = async (req, res) => {
             return res.status(400).json({ message: 'Search query is required.' });
         }
 
-        // Build match conditions
-        let matchConditions = {
-            $or: [
-                { title: { $regex: query, $options: 'i' } },
-                { description: { $regex: query, $options: 'i' } },
-                { longDescription: { $regex: query, $options: 'i' } }
-            ]
-        };
+        // Escape regex special characters for safe partial matching
+        const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const safeQuery = escapeRegex(String(query));
+
+        // Build text match (used later) and non-text filters (used early)
+        const textOrMatch = [
+            { title: { $regex: safeQuery, $options: 'i' } },
+            { slug: { $regex: safeQuery, $options: 'i' } },
+            { description: { $regex: safeQuery, $options: 'i' } },
+            { longDescription: { $regex: safeQuery, $options: 'i' } },
+            // Variant values (e.g., model numbers, sizes, codes)
+            { 'variants.values.value': { $regex: safeQuery, $options: 'i' } }
+        ];
+        let filterConditions = {};
         
         // Add category filter
         if (categories && categories.length > 0) {
             const categoryArray = Array.isArray(categories) ? categories : categories.split(',');
             const categoryDocs = await Category.find({ slug: { $in: categoryArray } });
             if (categoryDocs.length > 0) {
-                matchConditions.category = { $in: categoryDocs.map(cat => cat._id) };
+                filterConditions.category = { $in: categoryDocs.map(cat => cat._id) };
             }
         }
 
@@ -47,7 +53,7 @@ const liveSearch = async (req, res) => {
             const subCategoryArray = Array.isArray(subCategories) ? subCategories : subCategories.split(',');
             const subCategoryDocs = await Sub.find({ slug: { $in: subCategoryArray } });
             if (subCategoryDocs.length > 0) {
-                matchConditions.subCategory = { $in: subCategoryDocs.map(sub => sub._id) };
+                filterConditions.subCategory = { $in: subCategoryDocs.map(sub => sub._id) };
             }
         }
 
@@ -55,20 +61,20 @@ const liveSearch = async (req, res) => {
         if (brand) {
             const brandDoc = await Brand.findOne({ name: brand });
             if (brandDoc) {
-                matchConditions.brand = brandDoc._id;
+                filterConditions.brand = brandDoc._id;
             }
         }
 
         // Add rating filter
         if (rating) {
-            matchConditions.averageRating = { $gte: parseFloat(rating) };
+            filterConditions.averageRating = { $gte: parseFloat(rating) };
         }
 
         // Add price range filter
         if (minPrice || maxPrice) {
-            matchConditions.price = {};
-            if (minPrice) matchConditions.price.$gte = parseFloat(minPrice);
-            if (maxPrice) matchConditions.price.$lte = parseFloat(maxPrice);
+            filterConditions.price = {};
+            if (minPrice) filterConditions.price.$gte = parseFloat(minPrice);
+            if (maxPrice) filterConditions.price.$lte = parseFloat(maxPrice);
         }
 
         // Calculate pagination
@@ -76,6 +82,8 @@ const liveSearch = async (req, res) => {
         
         // Build aggregation pipeline
         const pipeline = [
+            // Early match with non-text filters to reduce dataset before lookups
+            Object.keys(filterConditions).length ? { $match: filterConditions } : undefined,
             {
                 $lookup: {
                     from: 'categories',
@@ -101,6 +109,14 @@ const liveSearch = async (req, res) => {
                 }
             },
             {
+                $lookup: {
+                    from: 'tags',
+                    localField: 'tags',
+                    foreignField: '_id',
+                    as: 'tagData'
+                }
+            },
+            {
                 $addFields: {
                     categoryName: { $arrayElemAt: ['$categoryData.name', 0] },
                     subCategoryName: { $arrayElemAt: ['$subCategoryData.name', 0] },
@@ -110,19 +126,31 @@ const liveSearch = async (req, res) => {
             {
                 $match: {
                     $or: [
-                        // Original product fields
-                        { title: { $regex: query, $options: 'i' } },
-                        { description: { $regex: query, $options: 'i' } },
-                        { longDescription: { $regex: query, $options: 'i' } },
-                        // Category, subcategory, and brand names
-                        { categoryName: { $regex: query, $options: 'i' } },
-                        { subCategoryName: { $regex: query, $options: 'i' } },
-                        { brandName: { $regex: query, $options: 'i' } }
+                        // Product fields
+                        ...textOrMatch,
+                        // Category, subcategory, brand, and tag names
+                        { categoryName: { $regex: safeQuery, $options: 'i' } },
+                        { subCategoryName: { $regex: safeQuery, $options: 'i' } },
+                        { brandName: { $regex: safeQuery, $options: 'i' } },
+                        { 'tagData.name': { $regex: safeQuery, $options: 'i' } }
                     ]
                 }
             },
-            // Apply additional filters
-            { $match: matchConditions },
+            // Project only required fields to reduce payload size
+            {
+                $project: {
+                    title: 1,
+                    slug: 1,
+                    price: 1,
+                    averageRating: 1,
+                    images: 1,
+                    category: 1,
+                    subCategory: 1,
+                    brand: 1,
+                    tags: 1,
+                    createdAt: 1
+                }
+            },
             // Get total count for pagination
             {
                 $facet: {
@@ -134,6 +162,9 @@ const liveSearch = async (req, res) => {
                 }
             }
         ];
+
+        // Remove undefined stages if no filterConditions
+        const finalPipeline = pipeline.filter(Boolean);
 
         // Add sorting
         let sortStage = {};
@@ -148,10 +179,10 @@ const liveSearch = async (req, res) => {
         }
 
         // Insert sort stage before pagination
-        const sortIndex = pipeline.findIndex(stage => stage.$facet);
-        pipeline.splice(sortIndex, 0, { $sort: sortStage });
+        const sortIndex = finalPipeline.findIndex(stage => stage.$facet);
+        finalPipeline.splice(sortIndex, 0, { $sort: sortStage });
 
-        const results = await Product.aggregate(pipeline);
+        const results = await Product.aggregate(finalPipeline);
 
         const totalProducts = results[0]?.metadata[0]?.total || 0;
         const totalPages = Math.ceil(totalProducts / parseInt(limit));
