@@ -94,6 +94,7 @@ app.use(
       "Authorization",
       "X-Requested-With",
       "X-Client",
+      "X-Guest-Id",
       "Accept",
       "Origin",
       "Cookie"
