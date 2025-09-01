@@ -203,7 +203,7 @@ const creatOrder = async (req, res) => {
           };
         });
 
-        const adminEmail = process.env.ADMIN_EMAIL || "info@etimadmart.com";
+        const adminEmail = process.env.ADMIN_EMAIL || "info@my.etimadmart.com";
 
         const result = await sendOrderEmailToAdmin({
           order: savedOrder,
