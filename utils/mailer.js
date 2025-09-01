@@ -113,7 +113,7 @@ const sendOrderEmailToAdmin = async ({ order, products, adminEmail }) => {
     const mailOptions = {
       from: `"Etimad Mart Orders" <${process.env.EMAIL_USERNAME}>`,
       to:
-        adminEmail || process.env.ADMIN_EMAIL || "info@etimadmart.com",
+        adminEmail || process.env.ADMIN_EMAIL || "info@my.etimadmart.com",
       subject: `📦 OrderMail: New Order #${
         order._id
       } - Rs.${order.totalPrice.toLocaleString()} - ${subjectSuffix}`,
