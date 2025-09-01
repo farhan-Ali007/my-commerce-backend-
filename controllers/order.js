@@ -20,13 +20,17 @@ const creatOrder = async (req, res) => {
     const isGuest = !userId;
 
     // Handle guest users
-    if (isGuest) {
+   if (isGuest) {
       userId = req.cookies?.guestId || uuidv4();
       console.log("userId---->", userId);
       if (!req.cookies?.guestId) {
+        const isProd = process.env.NODE_ENV === "production";
         res.cookie("guestId", userId, {
           maxAge: 30 * 24 * 60 * 60 * 1000,
           httpOnly: true,
+          path: "/",
+          sameSite: isProd ? "none" : "lax",
+          secure: isProd,
         });
       }
     }
