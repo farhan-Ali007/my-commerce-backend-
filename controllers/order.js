@@ -21,7 +21,7 @@ const creatOrder = async (req, res) => {
     const isGuest = !userId;
 
     // Handle guest users
-    if (isGuest) {
+   if (isGuest) {
       userId = req.cookies?.guestId || uuidv4();
       console.log("userId---->", userId);
       if (!req.cookies?.guestId) {
@@ -223,7 +223,7 @@ const creatOrder = async (req, res) => {
           };
         });
 
-        const adminEmail = process.env.ADMIN_EMAIL || "info@etimadmart.com";
+        const adminEmail = process.env.ADMIN_EMAIL || "info@my.etimadmart.com";
 
         // Mailer currently disabled. Uncomment to enable sending admin emails.
         const result = await sendOrderEmailToAdmin({

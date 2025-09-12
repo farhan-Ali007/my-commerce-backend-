@@ -99,6 +99,7 @@ app.use(
       "http://localhost:5173", 
       "https://etimadmart.com",
       "https://www.etimadmart.com",
+      "https://www.etimadmart.com",
       "https://etimadmart.netlify.app",
       "https://dev--etimadmart.netlify.app",
       "https://*.netlify.app"  // Allow all Netlify preview URLs
@@ -110,6 +111,7 @@ app.use(
       "Authorization",
       "X-Requested-With",
       "X-Client",
+      "X-Guest-Id",
       "X-Guest-Id",
       "Accept",
       "Origin",
@@ -142,6 +144,17 @@ app.use((err, req, res, next) => {
     status: "error",
     message: err.message || "Internal server error",
   });
+});
+
+// Prevent caching for order endpoints (guest/user specific)
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/v1/order')) {
+    res.set('Cache-Control', 'no-store');
+    res.set('Pragma', 'no-cache');
+    res.set('Surrogate-Control', 'no-store');
+    res.set('Vary', 'Origin, Cookie, Authorization, X-Guest-Id');
+  }
+  next();
 });
 
 // API Routes
