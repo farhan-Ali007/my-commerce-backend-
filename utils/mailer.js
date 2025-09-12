@@ -1,15 +1,30 @@
 const nodemailer = require("nodemailer");
 
-// Create transporter
+// Create transporter (production-hardened)
+const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
+const smtpPort = Number(process.env.SMTP_PORT || 587);
+const smtpSecureEnv = String(process.env.SMTP_SECURE || "").toLowerCase();
+// Use secure for port 465 or explicit SMTP_SECURE=true
+const smtpSecure = smtpSecureEnv === "true" || smtpPort === 465;
+
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: process.env.SMTP_PORT || 587,
-  secure: false,
-  pool: true,
-  maxConnections: 2,
-  maxMessages: 50,
-  rateDelta: 60000,
-  rateLimit: 100,
+  host: smtpHost,
+  port: smtpPort,
+  secure: smtpSecure,
+  // Some providers behind PaaS block long-lived SMTP pools; keep small and configurable
+  pool: process.env.SMTP_POOL ? process.env.SMTP_POOL === "true" : true,
+  maxConnections: Number(process.env.SMTP_MAX_CONNECTIONS || 2),
+  maxMessages: Number(process.env.SMTP_MAX_MESSAGES || 50),
+  rateDelta: Number(process.env.SMTP_RATE_DELTA || 60_000),
+  rateLimit: Number(process.env.SMTP_RATE_LIMIT || 100),
+  // Timeouts to avoid hanging the request forever
+  connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 10_000),
+  greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 10_000),
+  socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 20_000),
+  // For STARTTLS on 587, some providers require this
+  requireTLS: process.env.SMTP_REQUIRE_TLS === "true",
+  // Allow opting out of TLS verification in tricky hosting environments (not recommended)
+  tls: process.env.SMTP_IGNORE_TLS_ERRORS === "true" ? { rejectUnauthorized: false } : undefined,
   auth: {
     user: process.env.EMAIL_USERNAME,
     pass: process.env.EMAIL_PASSWORD,
@@ -113,7 +128,7 @@ const sendOrderEmailToAdmin = async ({ order, products, adminEmail }) => {
     const mailOptions = {
       from: `"Etimad Mart Orders" <${process.env.EMAIL_USERNAME}>`,
       to:
-        adminEmail || process.env.ADMIN_EMAIL || "info@etimadmart.com",
+        adminEmail || process.env.ADMIN_EMAIL || "info@my.etimadmart.com",
       subject: `📦 OrderMail: New Order #${
         order._id
       } - Rs.${order.totalPrice.toLocaleString()} - ${subjectSuffix}`,

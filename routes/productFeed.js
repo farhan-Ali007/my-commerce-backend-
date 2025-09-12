@@ -15,6 +15,20 @@ function stripHtml(html) {
   return html.replace(/<[^>]*>?/gm, '');
 }
 
+// Normalize an image entry to a URL string
+function toUrl(img) {
+  if (!img) return '';
+  if (typeof img === 'string') return img;
+  if (typeof img === 'object' && img.url) return img.url;
+  return '';
+}
+
+// Normalize an array of images to an array of URL strings
+function toUrls(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.map(toUrl).filter(Boolean);
+}
+
 router.get('/product-feed.csv', async (req, res) => {
   try {
     // Populate brand, category, and subCategory to get their names
@@ -87,14 +101,14 @@ router.get('/product-feed.csv', async (req, res) => {
         channel: 'online',
         'feed label': '', // set if you use feed labels
         language: 'en',
-        'additional image link': product.images && product.images.length > 1 ? product.images.slice(1).join(',') : '',
+        'additional image link': Array.isArray(product.images) && product.images.length > 1 ? toUrls(product.images.slice(1)).join(',') : '',
         'all clicks': '', // leave blank or fill if you track this
         brand: getBrandName(product.brand),
         'canonical link': `https://etimadmart.com/product/${product.slug}`,
         description: stripHtml(product.longDescription || product.description),
         'google product category': googleCategory,
         'identifier exists': 'FALSE', // or 'TRUE' if you have GTIN/MPN
-        'image link': product.images && product.images.length > 0 ? product.images[0] : '',
+        'image link': Array.isArray(product.images) && product.images.length > 0 ? toUrl(product.images[0]) : '',
         'item group id': '', // set if you have product groups/variants
         link: `https://etimadmart.com/product/${product.slug}`,
         mpn: '', // set if you have manufacturer part number
@@ -103,9 +117,9 @@ router.get('/product-feed.csv', async (req, res) => {
         'update type': '', // set if you use this
       };
       // Add additional images
-      if (product.images && product.images.length > 1) {
+      if (Array.isArray(product.images) && product.images.length > 1) {
         product.images.slice(1).forEach((img, idx) => {
-          row[idx === 0 ? 'additional_image_link' : `additional_image_link_${idx}`] = img;
+          row[idx === 0 ? 'additional_image_link' : `additional_image_link_${idx}`] = toUrl(img);
         });
       }
       csvStream.write(row);

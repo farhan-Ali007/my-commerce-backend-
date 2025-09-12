@@ -30,12 +30,16 @@ const popupRouter = require("./routes/popup.js");
 const chatbotRouter = require("./routes/chatbot.js");
 const logoRouter = require("./routes/logo.js");
 const analyticsRouter = require("./routes/analytics.js");
+const courierRouter = require("./routes/courier.js");
 const pageLayoutRouter = require("./routes/pageLayout.js");
 const mediaRouter = require("./routes/media.js");
 const trafficRouter = require("./routes/traffic.js");
 
 dotenv.config();
 const app = express();
+
+// Disable ETag to avoid 304 revalidation for dynamic endpoints
+app.set('etag', false);
 
 // Security Middleware
 app.use(
@@ -77,12 +81,24 @@ app.use(
 app.use(mongoSanitize());
 app.use(xss());
 
+// Prevent caching for order endpoints (guest/user specific)
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/v1/order')) {
+    res.set('Cache-Control', 'no-store');
+    res.set('Pragma', 'no-cache');
+    res.set('Surrogate-Control', 'no-store');
+    res.set('Vary', 'Origin, Cookie, Authorization, X-Guest-Id');
+  }
+  next();
+});
+
 // CORS configuration
 app.use(
   cors({
     origin: [
       "http://localhost:5173", 
       "https://etimadmart.com",
+      "https://www.etimadmart.com",
       "https://etimadmart.netlify.app",
       "https://dev--etimadmart.netlify.app",
       "https://*.netlify.app"  // Allow all Netlify preview URLs
@@ -94,6 +110,7 @@ app.use(
       "Authorization",
       "X-Requested-With",
       "X-Client",
+      "X-Guest-Id",
       "Accept",
       "Origin",
       "Cookie"
@@ -147,6 +164,7 @@ app.use("/api/v1/popup", popupRouter);
 app.use("/api/v1/chatbot", chatbotRouter);
 app.use("/api/v1/logo", logoRouter);
 app.use("/api/v1/analytics", analyticsRouter);
+app.use("/api/v1/courier", courierRouter);
 app.use("/api/v1/pageLayout", pageLayoutRouter);
 app.use("/api/v1/media", mediaRouter);
 app.use("/api/v1/traffic", trafficRouter);

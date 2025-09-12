@@ -41,11 +41,23 @@ const orderSchema = new mongoose.Schema({
     // Order source: which client placed it
     source: {
         type: String,
-        enum: ['web', 'mobile', 'unknown'],
+        enum: ['web', 'mobile', 'unknown' , 'manual'],
         default: 'unknown',
         index: true,
     },
     orderedAt: { type: Date, default: Date.now },
+    // Human-friendly incremental order number for external systems (e.g., courier portals)
+    orderShortId: { type: Number, index: true },
+    // Courier provider metadata (e.g., Leopard Courier Service)
+    shippingProvider: {
+        provider: { type: String, enum: ['lcs'], required: false },
+        pushed: { type: Boolean, default: false },
+        trackingNumber: { type: String },
+        consignmentNo: { type: String },
+        labelUrl: { type: String },
+        extra: { type: mongoose.Schema.Types.Mixed },
+        pushedAt: { type: Date },
+    },
 });
 
 module.exports = mongoose.model('Order', orderSchema);

@@ -1,5 +1,6 @@
 const Order = require("../models/order");
 const Product = require("../models/product");
+const Counter = require("../models/counter");
 const { v4: uuidv4 } = require("uuid");
 const { createNotification } = require("./notification");
 const { sendOrderEmailToAdmin } = require("../utils/mailer");
@@ -24,9 +25,13 @@ const creatOrder = async (req, res) => {
       userId = req.cookies?.guestId || uuidv4();
       console.log("userId---->", userId);
       if (!req.cookies?.guestId) {
+        const isProd = process.env.NODE_ENV === "production";
         res.cookie("guestId", userId, {
           maxAge: 30 * 24 * 60 * 60 * 1000,
           httpOnly: true,
+          path: "/",
+          sameSite: isProd ? "none" : "lax",
+          secure: isProd,
         });
       }
     }
@@ -67,11 +72,12 @@ const creatOrder = async (req, res) => {
       return res.status(400).json({ error: "Failed to update all products" });
     }
 
-    // Determine order source (web/mobile/unknown)
+    // Determine order source (web/mobile/manual/unknown)
     const clientHeader = (req.get("X-Client") || "").toLowerCase();
     let source = "unknown";
     if (clientHeader === "mobile") source = "mobile";
     else if (clientHeader === "web") source = "web";
+    else if (clientHeader === "manual") source = "manual";
     else {
       const ua = (req.get("User-Agent") || "").toLowerCase();
       // Simple UA heuristic fallback
@@ -84,6 +90,14 @@ const creatOrder = async (req, res) => {
       }
     }
 
+    // Generate incremental short order id (starts at 1000)
+    const seqDoc = await Counter.findOneAndUpdate(
+      { _id: "order" },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true }
+    );
+    const orderShortId = (seqDoc?.seq || 0) + 1000;
+
     // Create a new order
     const newOrder = new Order({
       orderedBy: isGuest ? null : userId,
@@ -94,12 +108,18 @@ const creatOrder = async (req, res) => {
       freeShipping,
       deliveryCharges,
       source,
+      orderShortId,
     });
 
     const savedOrder = await newOrder.save();
     res
       .status(201)
-      .json({ message: "Order placed successfully!", order: savedOrder });
+      .json({
+        message: "Order placed successfully!",
+        order: savedOrder,
+        // Expose guestId in response so frontend can persist when 3P cookies are blocked
+        guestId: isGuest ? userId : undefined,
+      });
 
     // Create notification for order placement (only for registered users)
     if (!isGuest && userId) {
@@ -205,12 +225,14 @@ const creatOrder = async (req, res) => {
 
         const adminEmail = process.env.ADMIN_EMAIL || "info@etimadmart.com";
 
+        // Mailer currently disabled. Uncomment to enable sending admin emails.
         const result = await sendOrderEmailToAdmin({
           order: savedOrder,
           products: productsWithDetails,
           adminEmail: adminEmail,
         });
-        console.log("Email sent to admin:", result);
+        // console.log("Email sent to admin:", result);
+        console.log("Admin email send skipped (mailer disabled)");
       } catch (emailError) {
         console.error("Error sending order email to admin:", emailError);
         // Don't fail the order creation if email fails
@@ -234,7 +256,11 @@ const creatOrder = async (req, res) => {
 const getMyOrders = async (req, res) => {
   try {
     let { userId } = req.params;
-    const guestId = req.cookies?.guestId;
+    // Accept guestId from cookie OR explicit header/query for environments where 3P cookies are blocked
+    const guestId =
+      req.cookies?.guestId ||
+      req.get("X-Guest-Id") ||
+      req.query.guestId;
 
     console.log("userId---->", userId);
     console.log("guestId---->", guestId);
@@ -253,16 +279,20 @@ const getMyOrders = async (req, res) => {
       return res.status(200).json({ orders: [] });
     }
 
-    const orders = await Order.find({
-      $or: query,
-    })
-      .populate("cartSummary.product")
-      .populate("orderedBy", "username mobile")
-      .populate("shippingAddress")
+    const orders = await Order.find({ $or: query })
+      .populate({
+        path: "orderedBy",
+        select: "name email phoneNumber address city zipCode",
+      })
+      .populate({
+        path: "cartSummary.product",
+        select: "title slug price salePrice images",
+      })
       .sort({ orderedAt: -1 });
 
+    res.set("Cache-Control", "no-store");
+    res.set("Vary", "Origin, Cookie, Authorization, X-Guest-Id");
     res.status(200).json({ orders });
-    // console.log("My orders------->", orders);
   } catch (error) {
     console.error("Error fetching my orders:", error);
     res.status(500).json({ error: "Failed to fetch orders" });

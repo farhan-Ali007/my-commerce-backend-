@@ -597,7 +597,7 @@ const getProductBySlug = async (req, res) => {
             .populate('category', 'name slug')
             .populate('subCategory', 'name')
             .populate('tags', 'name')
-            .populate('brand', 'name')
+            .populate('brand', 'name slug' )
             .populate({
                 path: 'reviews',
                 select: 'rating reviewText createdAt',
