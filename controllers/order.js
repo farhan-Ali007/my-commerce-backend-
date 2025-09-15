@@ -226,11 +226,11 @@ const creatOrder = async (req, res) => {
         const adminEmail = process.env.ADMIN_EMAIL || "info@my.etimadmart.com";
 
         // Mailer currently disabled. Uncomment to enable sending admin emails.
-        const result = await sendOrderEmailToAdmin({
-          order: savedOrder,
-          products: productsWithDetails,
-          adminEmail: adminEmail,
-        });
+        // const result = await sendOrderEmailToAdmin({
+        //   order: savedOrder,
+        //   products: productsWithDetails,
+        //   adminEmail: adminEmail,
+        // });
         // console.log("Email sent to admin:", result);
         console.log("Admin email send skipped (mailer disabled)");
       } catch (emailError) {
@@ -250,6 +250,74 @@ const creatOrder = async (req, res) => {
       error: "Failed to create order",
       details: error.message,
     });
+  }
+};
+
+// Admin: Update order details (shipping address fields and additional instructions) when order is still editable
+const updateOrderDetails = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { shippingAddress } = req.body;
+
+    if (!orderId) return res.status(400).json({ error: "orderId is required" });
+    if (!shippingAddress || typeof shippingAddress !== 'object') {
+      return res.status(400).json({ error: "shippingAddress payload is required" });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    // Guard: allow editing only if order is Pending and not pushed to courier
+    if (order.status !== 'Pending') {
+      return res.status(400).json({ error: "Only Pending orders can be edited" });
+    }
+    if (order?.shippingProvider?.pushed) {
+      return res.status(400).json({ error: "Order already pushed to courier; cannot edit" });
+    }
+
+    // Whitelist fields to update
+    const next = {
+      fullName: shippingAddress.fullName ?? order.shippingAddress.fullName,
+      streetAddress: shippingAddress.streetAddress ?? order.shippingAddress.streetAddress,
+      city: shippingAddress.city ?? order.shippingAddress.city,
+      mobile: shippingAddress.mobile ?? order.shippingAddress.mobile,
+      additionalInstructions: shippingAddress.additionalInstructions ?? order.shippingAddress.additionalInstructions,
+    };
+
+    // Basic validation
+    if (!next.fullName || !next.streetAddress || !next.city || !next.mobile) {
+      return res.status(400).json({ error: "Missing required shipping fields" });
+    }
+
+    order.shippingAddress = next;
+    const saved = await order.save();
+    return res.status(200).json({ success: true, order: saved });
+  } catch (error) {
+    console.error('Error updating order details:', error);
+    return res.status(500).json({ error: 'Failed to update order details' });
+  }
+};
+
+// Admin: Delete an order if still Pending and not pushed to courier
+const deleteOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    if (!orderId) return res.status(400).json({ error: 'orderId is required' });
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    if (order.status !== 'Pending') {
+      return res.status(400).json({ error: 'Only Pending orders can be deleted' });
+    }
+    if (order?.shippingProvider?.pushed) {
+      return res.status(400).json({ error: 'Order already pushed to courier; cannot delete' });
+    }
+
+    await Order.deleteOne({ _id: orderId });
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Error deleting order:', error);
+    return res.status(500).json({ error: 'Failed to delete order' });
   }
 };
 
@@ -639,4 +707,6 @@ module.exports = {
   getRecentOrders,
   searchOrders,
   sortOrdersByStatus,
+  updateOrderDetails,
+  deleteOrder,
 };
