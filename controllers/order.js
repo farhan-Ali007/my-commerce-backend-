@@ -226,11 +226,11 @@ const creatOrder = async (req, res) => {
         const adminEmail = process.env.ADMIN_EMAIL || "info@my.etimadmart.com";
 
         // Mailer currently disabled. Uncomment to enable sending admin emails.
-        // const result = await sendOrderEmailToAdmin({
-        //   order: savedOrder,
-        //   products: productsWithDetails,
-        //   adminEmail: adminEmail,
-        // });
+        const result = await sendOrderEmailToAdmin({
+          order: savedOrder,
+          products: productsWithDetails,
+          adminEmail: adminEmail,
+        });
         // console.log("Email sent to admin:", result);
         console.log("Admin email send skipped (mailer disabled)");
       } catch (emailError) {
