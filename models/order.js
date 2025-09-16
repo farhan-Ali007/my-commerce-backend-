@@ -33,6 +33,10 @@ const orderSchema = new mongoose.Schema({
     deliveryCharges: { type: Number, default: 0 },
     freeShipping: { type: Boolean, default: false },
     totalPrice: { type: Number, required: true },
+    // Coupon/discount (optional)
+    couponCode: { type: String },
+    couponType: { type: String, enum: ['percent', 'fixed'], required: false },
+    discountAmount: { type: Number, default: 0 },
     status: {
         type: String,
         enum: ['Pending', 'Shipped', 'Delivered', 'Cancelled'],

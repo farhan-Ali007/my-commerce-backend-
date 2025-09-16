@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require("uuid");
 const { createNotification } = require("./notification");
 const { sendOrderEmailToAdmin } = require("../utils/mailer");
 const User = require("../models/user");
+const Coupon = require("../models/coupon");
 
 const creatOrder = async (req, res) => {
   try {
@@ -14,6 +15,9 @@ const creatOrder = async (req, res) => {
       totalPrice,
       freeShipping,
       deliveryCharges,
+      couponCode,
+      couponType,
+      discountAmount,
     } = req.body;
     console.log("Coming order from frontend------>", req.body);
 
@@ -107,11 +111,25 @@ const creatOrder = async (req, res) => {
       totalPrice,
       freeShipping,
       deliveryCharges,
+      couponCode: couponCode || undefined,
+      couponType: couponType || undefined,
+      discountAmount: Number(discountAmount || 0),
       source,
       orderShortId,
     });
 
     const savedOrder = await newOrder.save();
+    // Increment coupon usage if applied (best-effort, do not block response)
+    if (couponCode) {
+      try {
+        await Coupon.updateOne(
+          { code: String(couponCode).toUpperCase().trim() },
+          { $inc: { usedCount: 1 } }
+        );
+      } catch (e) {
+        console.warn('Failed to increment coupon usedCount:', e?.message || e);
+      }
+    }
     res
       .status(201)
       .json({
