@@ -13,6 +13,8 @@ const couponSchema = new mongoose.Schema({
   active: { type: Boolean, default: true },
   notes: { type: String },
   usedCount: { type: Number, default: 0 },
+  // Optional: limit applicability to specific categories. If empty or undefined => sitewide
+  allowedCategoryIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }],
 }, { timestamps: true });
 
 module.exports = mongoose.model('Coupon', couponSchema);

@@ -1,5 +1,6 @@
 const Coupon = require('../models/coupon');
 const Order = require('../models/order');
+const Product = require('../models/product');
 
 // Validate a coupon against a cart summary
 // Expects: { code, cartSummary: [{ price, count }], subtotal }
@@ -52,7 +53,54 @@ exports.validateCoupon = async (req, res) => {
     }
 
     const delivery = Number(deliveryCharges || 0) || 0;
-    const baseAmount = Math.max(0, computedSubtotal + delivery);
+
+    // Determine discount base
+    // If coupon has allowedCategoryIds, only items in those categories are eligible (delivery not discounted)
+    // Otherwise (sitewide), discount base is subtotal + delivery
+    let baseAmount = 0;
+    const allowedCats = Array.isArray(coupon.allowedCategoryIds) && coupon.allowedCategoryIds.length > 0
+      ? coupon.allowedCategoryIds.map(id => String(id))
+      : [];
+
+    if (allowedCats.length > 0) {
+      // Ensure each cart item has categoryIds; if missing but productId present, infer from Product
+      const itemsNeedingCats = Array.isArray(cartSummary) ? cartSummary.filter(it => (!Array.isArray(it.categoryIds) || it.categoryIds.length === 0) && it.productId) : [];
+      let productCatMap = {};
+      if (itemsNeedingCats.length > 0) {
+        const ids = [...new Set(itemsNeedingCats.map(it => String(it.productId)))];
+        try {
+          const products = await Product.find({ _id: { $in: ids } }).select('_id category');
+          productCatMap = products.reduce((acc, p) => {
+            acc[String(p._id)] = p.category ? [String(p.category)] : [];
+            return acc;
+          }, {});
+        } catch (e) {
+          // If product lookup fails, proceed with existing categoryIds only
+        }
+      }
+
+      const eligibleSubtotal = (Array.isArray(cartSummary) ? cartSummary : []).reduce((sum, it) => {
+        const price = Number(it.price || 0);
+        const count = Number(it.count || 0);
+        let cats = Array.isArray(it.categoryIds) ? it.categoryIds.map(String) : [];
+        if ((!cats || cats.length === 0) && it.productId && productCatMap[String(it.productId)]) {
+          cats = productCatMap[String(it.productId)];
+        }
+        const matches = cats.some(c => allowedCats.includes(String(c)));
+        return matches ? sum + price * count : sum;
+      }, 0);
+      baseAmount = Math.max(0, eligibleSubtotal);
+
+      // If coupon is category-scoped but no eligible items in the cart, return a clear message
+      if (baseAmount <= 0) {
+        return res.status(200).json({
+          valid: false,
+          message: 'This coupon applies only to selected categories and none of your items are eligible.',
+        });
+      }
+    } else {
+      baseAmount = Math.max(0, computedSubtotal + delivery);
+    }
     let discount = 0;
     if (coupon.type === 'percent') {
       discount = (baseAmount * coupon.value) / 100;
@@ -64,7 +112,7 @@ exports.validateCoupon = async (req, res) => {
     }
 
     discount = Math.max(0, Math.round(discount));
-    const newTotal = Math.max(0, baseAmount - discount);
+    const newTotal = Math.max(0, (allowedCats.length > 0 ? computedSubtotal + delivery : baseAmount) - discount);
 
     return res.status(200).json({
       valid: true,
