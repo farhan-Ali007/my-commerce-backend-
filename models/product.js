@@ -80,11 +80,11 @@ const productSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
-    category: {
+    categories: [{
         required: true,
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Categories',
-    },
+    }],
     subCategory: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'SubCategory',

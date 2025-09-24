@@ -8,7 +8,7 @@ const colorSettingsSchema = new mongoose.Schema({
     },
     secondary: {
         type: String,
-        default: "#FFB727",
+        default: "#FD9421",
         required: true
     }
 }, { timestamps: true });

@@ -34,7 +34,7 @@ router.get('/product-feed.csv', async (req, res) => {
     // Populate brand, category, and subCategory to get their names
     const products = await Product.find({})
       .populate('brand', 'name title')
-      .populate('category', 'name title')
+      .populate('categories', 'name title')
       .populate('subCategory', 'name title')
       .exec();
 

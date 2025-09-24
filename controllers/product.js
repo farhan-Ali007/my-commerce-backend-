@@ -52,7 +52,7 @@ const createProduct = async (req, res) => {
             price,
             salePrice,
             weight,
-            category,
+            categories,
             subCategory,
             stock,
             brand,
@@ -70,7 +70,7 @@ const createProduct = async (req, res) => {
         console.log("Raw slug from req.body (createProduct):", slug);
 
         // Validate required fields
-        if (!title || !description || !price || !category || !stock || !req.files.images) {
+        if (!title || !description || !price || !categories || !stock || !req.files.images) {
             return res.status(400).json({ message: "All fields are required" });
         }
 
@@ -104,14 +104,22 @@ const createProduct = async (req, res) => {
             tagsArray.push('new');
         }
 
-        // Validate category and subcategory
-        const categoryDoc = await validateCategory(category);
+        // Parse and validate categories
+        let parsedCategories;
+        try {
+            parsedCategories = Array.isArray(categories) ? categories : JSON.parse(categories);
+        } catch (error) {
+            return res.status(400).json({ message: "Invalid categories data format." });
+        }
+
+        // Validate categories and subcategory
+        const categoryDocs = await validateCategories(parsedCategories);
         const subCategoryDoc = await validateSubCategory(subCategory);
         const brandDoc = brand ? await validateBrand(brand) : null;
 
         if (!brandDoc) return res.status(400).json({ message: "Invalid brand." });
-        if (!categoryDoc) {
-            return res.status(400).json({ message: "Invalid category or subcategory." });
+        if (!categoryDocs || categoryDocs.length === 0) {
+            return res.status(400).json({ message: "At least one valid category is required." });
         }
 
         // Process tags
@@ -141,7 +149,7 @@ const createProduct = async (req, res) => {
             slug: generateSlug(title, slug),
             salePrice,
             weight,
-            category: categoryDoc._id,
+            categories: categoryDocs.map(cat => cat._id),
             subCategory: subCategoryDoc?._id || null,
             stock,
             sold: 0,
@@ -174,6 +182,17 @@ const createProduct = async (req, res) => {
 const validateCategory = async (category) => {
     const categoryDoc = await Category.findOne({ name: category.toLowerCase() });
     return categoryDoc;
+};
+
+const validateCategories = async (categories) => {
+    const categoryDocs = [];
+    for (const categoryName of categories) {
+        const categoryDoc = await Category.findOne({ name: categoryName.toLowerCase() });
+        if (categoryDoc) {
+            categoryDocs.push(categoryDoc);
+        }
+    }
+    return categoryDocs;
 };
 
 const validateBrand = async (brand) => {
@@ -267,7 +286,7 @@ const updateProduct = async (req, res) => {
             price,
             salePrice,
             weight,
-            category,
+            categories,
             subCategory,
             stock,
             brand,
@@ -284,7 +303,7 @@ const updateProduct = async (req, res) => {
             volumeTiers,
         } = req.body;
 
-        console.log("category from frontend:", category, "subCategory from frontend:", subCategory);
+        console.log("categories from frontend:", categories, "subCategory from frontend:", subCategory);
         console.log("Coming data in update controller from frontend------>", req.body)
         console.log("Raw slug from req.body (updateProduct):", slug);
         console.log("subCategory field in request body:", req.body.subCategory);
@@ -307,8 +326,8 @@ const updateProduct = async (req, res) => {
             if (oldSlug && oldSlug !== newSlug) {
                 // Always redirect to category page
                 let redirectTo = '/';
-                if (product.category) {
-                    const cat = await Category.findById(product.category);
+                if (product.categories && product.categories.length > 0) {
+                    const cat = await Category.findById(product.categories[0]);
                     if (cat && cat.slug) {
                         redirectTo = `/category/${cat.slug}`;
                     }
@@ -326,17 +345,20 @@ const updateProduct = async (req, res) => {
             product.tags = tagIds;
         }
 
-        // CATEGORY
-        if (category && category !== "") {
-            if (mongoose.Types.ObjectId.isValid(category)) {
-                const categoryObj = await Category.findById(category);
-                if (!categoryObj) {
-                    return res.status(404).json({ message: `Category not found for ID: ${category}` });
-                }
-                product.category = categoryObj._id;
-            } else {
-                return res.status(400).json({ message: "Invalid category ID format." });
+        // CATEGORIES
+        if (categories && categories !== "") {
+            let parsedCategories;
+            try {
+                parsedCategories = Array.isArray(categories) ? categories : JSON.parse(categories);
+            } catch (error) {
+                return res.status(400).json({ message: "Invalid categories data format." });
             }
+
+            const categoryDocs = await validateCategories(parsedCategories);
+            if (!categoryDocs || categoryDocs.length === 0) {
+                return res.status(400).json({ message: "At least one valid category is required." });
+            }
+            product.categories = categoryDocs.map(cat => cat._id);
         }
 
         // Handle brand
@@ -552,7 +574,7 @@ const getAllProducts = async (req, res) => {
         const totalPages = Math.ceil(totalProducts / safeLimit);
 
         const products = await Product.find({})
-            .populate('category', 'name slug')
+            .populate('categories', 'name slug')
             .populate('tags', 'name')
             .populate('brand', 'name')
             .populate({
@@ -563,8 +585,8 @@ const getAllProducts = async (req, res) => {
                     select: 'username email'
                 }
             })
+            .sort([['createdAt', 'desc']])
             .skip(skip)
-            .sort([['updatedAt', 'desc'], ['createdAt', 'desc']])
             .limit(safeLimit);
 
         // Calculate average rating for each product and add it to the product object
@@ -594,7 +616,7 @@ const getProductBySlug = async (req, res) => {
         const { slug } = req.params;
         // Try to find the product by current slug
         let product = await Product.findOne({ slug })
-            .populate('category', 'name slug')
+            .populate('categories', 'name slug')
             .populate('subCategory', 'name')
             .populate('tags', 'name')
             .populate('brand', 'name slug' )
@@ -648,8 +670,8 @@ const deleteProduct = async (req, res) => {
 
         // Add redirect for the current slug to the parent category (or home if not available)
         let redirectTo = '/';
-        if (product.category) {
-            const cat = await Category.findById(product.category);
+        if (product.categories && product.categories.length > 0) {
+            const cat = await Category.findById(product.categories[0]);
             if (cat && cat.slug) {
                 redirectTo = `/category/${cat.slug}`;
             }
@@ -686,7 +708,7 @@ const deleteProduct = async (req, res) => {
 const getMyProducts = async (req, res) => {
     try {
         const products = await Product.find({ creator: req.user.id })
-            .populate('category', 'name slug')
+            .populate('categories', 'name slug')
             .populate('tags', 'name')
             .sort({ createdAt: -1 })
 
@@ -712,10 +734,10 @@ const getRelatedProducts = async (req, res) => {
 
         // Fetch related products based on category
         let relatedProducts = await Product.find({
-            category: categoryId,
+            categories: categoryId,
             _id: { $ne: excludeProductId }
         })
-            .populate('category', 'name slug')
+            .populate('categories', 'name slug')
             .populate('tags', 'name')
             .skip(skip)
             .limit(limit)
@@ -729,13 +751,13 @@ const getRelatedProducts = async (req, res) => {
             ]);
 
             relatedProducts = await Product.populate(relatedProducts, [
-                { path: 'category', select: 'name slug' },
+                { path: 'categories', select: 'name slug' },
                 { path: 'tags', select: 'name' }
             ]);
         }
 
         const totalProducts = await Product.countDocuments({
-            category: objectedCategoryId,
+            categories: objectedCategoryId,
             _id: { $ne: excludeProductId }
         });
 
@@ -782,7 +804,7 @@ const getBestSellers = async (req, res) => {
         const totalPages = Math.ceil(totalProducts / safeLimit);
 
         const products = await Product.find({ tags: { $in: [bestSellerTag._id] } })
-            .populate('category', 'name slug')
+            .populate('categories', 'name slug')
             .populate('tags', 'name')
             .populate('brand', 'name')
             .populate({
@@ -835,7 +857,7 @@ const getProductsBySubCategory = async (req, res) => {
         const totalPages = Math.ceil(totalProducts / limit);
 
         const products = await Product.find({ subCategory: subCategoryDoc._id })
-            .populate('category', 'name slug')
+            .populate('categories', 'name slug')
             .populate('tags', 'name')
             .populate('brand', 'name')
             .populate({
@@ -895,7 +917,7 @@ const getFeaturedProducts = async (req, res) => {
         const totalPages = Math.ceil(totalProducts / safeLimit);
 
         const products = await Product.find({ tags: { $in: [featuredTag._id] } })
-            .populate('category', 'name slug')
+            .populate('categories', 'name slug')
             .populate('tags', 'name')
             .populate('brand', 'name')
             .populate({
@@ -955,7 +977,7 @@ const getNewArrivals = async (req, res) => {
         const totalPages = Math.ceil(totalProducts / limit);
 
         const products = await Product.find({ tags: { $in: [newTag._id] } })
-            .populate('category', 'name slug')
+            .populate('categories', 'name slug')
             .populate('tags', 'name')
             .populate('brand', 'name')
             .populate({

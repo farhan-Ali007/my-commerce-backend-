@@ -192,10 +192,10 @@ const liveSearch = async (req, res) => {
 
         // Populate additional fields for the products
         const populatedProducts = await Product.populate(products, [
-            { path: 'category', select: 'name slug' },
+            { path: 'categories', select: 'name slug' },
             { path: 'subCategory', select: 'name slug' },
             { path: 'tags', select: 'name' },
-            { path: 'brand', select: 'name' },
+            { path: 'brand', select: 'name slug' },
             {
                 path: 'reviews',
                 select: 'rating reviewText createdAt',
@@ -234,7 +234,7 @@ const sortByPrice = async (req, res) => {
         const totalPages = Math.ceil(totalProducts / limit);
 
         const products = await Product.find({})
-            .populate('category', 'name')
+            .populate('categories', 'name')
             .populate('tags', 'name')
             .populate('brand', 'name')
             .sort({ price: sort === 'asc' ? 1 : -1 })
@@ -311,11 +311,11 @@ const filterByCategory = async (req, res) => {
         const categoryIds = categories.map((category) => category._id);
         const skip = (page - 1) * limit;
 
-        const totalProducts = await Product.countDocuments({ category: { $in: categoryIds } });
+        const totalProducts = await Product.countDocuments({ categories: { $in: categoryIds } });
         const totalPages = Math.ceil(totalProducts / limit);
 
-        const products = await Product.find({ category: { $in: categoryIds } })
-            .populate('category', 'name')
+        const products = await Product.find({ categories: { $in: categoryIds } })
+            .populate('categories', 'name')
             .populate('tags', 'name')
             .populate('brand', 'name')
             .sort([['createdAt', 'desc']])
@@ -372,7 +372,7 @@ const filterBySubCategory = async (req, res) => {
         const totalPages = Math.ceil(totalProducts / limit);
 
         const products = await Product.find({ subCategory: { $in: subcategoryIds } })
-            .populate('category', 'name')
+            .populate('categories', 'name')
             .populate('subCategory', 'name slug')
             .populate('tags', 'name')
             .populate('brand', 'name')
@@ -459,7 +459,7 @@ const filterProductsbyBrands = async (req, res) => {
         const totalPages = Math.ceil(totalProducts / limit);
 
         const products = await Product.find({ brand: brandData._id })
-            .populate('category', 'name')
+            .populate('categories', 'name')
             .populate('tags', 'name')
             .populate('brand', 'name slug')
             .populate({
@@ -470,7 +470,7 @@ const filterProductsbyBrands = async (req, res) => {
                     select: 'name email'
                 }
             })
-            .sort([['updatedAt', 'desc'], ['createdAt', 'desc']])
+            .sort([['createdAt', 'desc']])
             .skip(skip)
             .limit(limit);
 
@@ -520,7 +520,7 @@ const filterByPriceRange = async (req, res) => {
         const products = await Product.find({
             price: { $gte: minPrice, $lte: maxPrice }
         })
-            .populate('category', 'name')
+            .populate('categories', 'name')
             .populate('tags', 'name')
             .populate('brand', 'name')
             .sort({ price: 1 })
