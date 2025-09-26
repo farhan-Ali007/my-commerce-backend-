@@ -79,11 +79,25 @@ router.get('/homepage-data', async (req, res) => {
       // Topbar active text(s)
       Topbar.findOne({ isEnable: true }).select('text isEnable').lean(),
 
-      // Menu categories for navbar/menu
-      Category.find({ menu: true })
-        .select('name slug Image menu')
-        .limit(30)
-        .lean()
+      // Menu categories for navbar/menu (with subcategories)
+      Category.aggregate([
+        { $match: { menu: true } },
+        { $sort: { name: 1 } },
+        { $limit: 30 },
+        {
+          $lookup: {
+            from: 'subcategories', // collection name inferred from SubCategory model
+            localField: '_id',
+            foreignField: 'category',
+            pipeline: [
+              { $project: { _id: 1, name: 1, slug: 1 } },
+              { $sort: { name: 1 } }
+            ],
+            as: 'subcategories'
+          }
+        },
+        { $project: { name: 1, slug: 1, Image: 1, menu: 1, subcategories: 1 } }
+      ])
     ]);
 
     // Get showcase category products in parallel
