@@ -52,15 +52,20 @@ const orderSchema = new mongoose.Schema({
     orderedAt: { type: Date, default: Date.now },
     // Human-friendly incremental order number for external systems (e.g., courier portals)
     orderShortId: { type: Number, index: true },
-    // Courier provider metadata (e.g., Leopard Courier Service)
+    // Courier provider metadata (e.g., Leopard Courier Service, PostEx)
     shippingProvider: {
-        provider: { type: String, enum: ['lcs'], required: false },
+        provider: { type: String, enum: ['lcs', 'postex'], required: false },
         pushed: { type: Boolean, default: false },
         trackingNumber: { type: String },
         consignmentNo: { type: String },
         labelUrl: { type: String },
         extra: { type: mongoose.Schema.Types.Mixed },
         pushedAt: { type: Date },
+        // PostEx specific fields
+        orderRefNumber: { type: String }, // PostEx order reference
+        postexOrderId: { type: String }, // PostEx internal order ID
+        status: { type: String }, // PostEx order status
+        lastStatusUpdate: { type: Date },
     },
 });
 

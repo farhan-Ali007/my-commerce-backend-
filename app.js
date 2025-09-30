@@ -36,6 +36,7 @@ const pageLayoutRouter = require("./routes/pageLayout.js");
 const mediaRouter = require("./routes/media.js");
 const trafficRouter = require("./routes/traffic.js");
 const homepageRouter = require("./routes/homepage.js");
+const postexRouter = require("./routes/postex.js");
 
 dotenv.config();
 const app = express();
@@ -184,6 +185,7 @@ app.use("/api/v1/coupon", couponRouter);
 app.use("/api/v1/pageLayout", pageLayoutRouter);
 app.use("/api/v1/media", mediaRouter);
 app.use("/api/v1/traffic", trafficRouter);
+app.use("/api/v1/postex", postexRouter);
 app.use("/api/v1", homepageRouter);
 
 // Register sitemap route BEFORE dynamic page route to avoid conflicts
