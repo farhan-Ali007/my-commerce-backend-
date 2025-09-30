@@ -18,23 +18,6 @@ class PostExService {
       console.error('PostEx API token not configured (POSTEX_API_TOKEN). Disabling PostEx.');
       this.isEnabled = false;
     }
-
-    // Dedicated axios instance to avoid global interceptors/header pollution
-    this.http = axios.create({
-      baseURL: this.baseURL,
-      timeout: 30000
-    });
-    this.http.interceptors.request.use((config) => {
-      config.headers = config.headers || {};
-      // Attach PostEx token header (required by PostEx)
-      if (this.token) config.headers['token'] = this.token;
-      // Duplicate in Authorization as a fallback for proxies that strip custom headers
-      if (this.token && !config.headers['Authorization']) {
-        config.headers['Authorization'] = `Bearer ${this.token}`;
-      }
-      if (!config.headers['Content-Type']) config.headers['Content-Type'] = 'application/json';
-      return config;
-    });
   }
 
   /**
@@ -56,9 +39,16 @@ class PostExService {
       
       console.log('Creating PostEx order:', JSON.stringify(postexPayload, null, 2));
       
-      const response = await this.http.post(
-        '/v3/create-order',
-        postexPayload
+      const response = await axios.post(
+        `${this.baseURL}/v3/create-order`,
+        postexPayload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'token': this.token
+          },
+          timeout: 30000 // 30 seconds timeout
+        }
       );
 
       console.log('PostEx order created successfully:', JSON.stringify(response.data, null, 2));
@@ -93,9 +83,14 @@ class PostExService {
     }
 
     try {
-      const response = await this.http.get(
-        `/v1/track-order/${orderRefNumber}`,
-        { timeout: 15000 }
+      const response = await axios.get(
+        `${this.baseURL}/v1/track-order/${orderRefNumber}`,
+        {
+          headers: {
+            'token': this.token
+          },
+          timeout: 15000
+        }
       );
 
       // Normalize PostEx tracking response
@@ -133,10 +128,16 @@ class PostExService {
     }
 
     try {
-      const response = await this.http.put(
-        `/v1/cancel-order`,
+      const response = await axios.put(
+        `${this.baseURL}/v1/cancel-order`,
         { trackingNumber },
-        { timeout: 15000 }
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'token': this.token
+          },
+          timeout: 15000
+        }
       );
 
       return response.data;
@@ -184,9 +185,16 @@ class PostExService {
     }
 
     try {
-      const response = await this.http.get(
-        `/v2/get-operational-city`,
-        { timeout: 15000 }
+      const response = await axios.get(
+        `${this.baseURL}/v2/get-operational-city`,
+        {
+          headers: {
+            'token': this.token,
+            'Accept': 'application/json'
+          },
+          // Do not forward enum param to avoid tenant-specific enum mismatches.
+          timeout: 15000
+        }
       );
 
       const raw = response.data;
