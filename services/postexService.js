@@ -1,13 +1,22 @@
 const axios = require('axios');
 
+// Helper: trim and strip surrounding single/double quotes
+const cleanEnv = (val, fallback = '') => {
+  if (val == null) return String(fallback);
+  const s = String(val).trim();
+  // Remove one or more leading/trailing quotes
+  return s.replace(/^\s*["']+|["']+\s*$/g, '');
+};
+
 class PostExService {
   constructor() {
-    this.baseURL = process.env.POSTEX_BASE_URL || 'https://api.postex.pk/services/integration/api/order';
-    this.token = process.env.POSTEX_API_TOKEN;
-    this.isEnabled = process.env.POSTEX_ENABLED === 'true';
+    this.baseURL = cleanEnv(process.env.POSTEX_BASE_URL || 'https://api.postex.pk/services/integration/api/order');
+    this.token = cleanEnv(process.env.POSTEX_API_TOKEN || '');
+    this.isEnabled = cleanEnv(process.env.POSTEX_ENABLED || '').toLowerCase() === 'true';
     
-    if (!this.token && this.isEnabled) {
-      console.warn('PostEx API token not configured');
+    if (this.isEnabled && !this.token) {
+      console.error('PostEx API token not configured (POSTEX_API_TOKEN). Disabling PostEx.');
+      this.isEnabled = false;
     }
   }
 
