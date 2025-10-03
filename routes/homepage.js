@@ -5,15 +5,16 @@ const Category = require('../models/category');
 const Brand = require('../models/brand');
 const Banner = require('../models/banner');
 const Topbar = require('../models/topbar');
-
 // Cache for homepage data (in-memory cache for Railway)
 let homepageCache = null;
 let cacheTimestamp = null;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-// Combined homepage data endpoint - Single API call for all homepage content
-router.get('/homepage-data', async (req, res) => {
-  try {
+  // Combined homepage data endpoint - Single API call for all homepage content
+  router.get('/homepage-data', async (req, res) => {
+    try {
+      // Set HTTP cache headers for better client/proxy caching
+      res.setHeader('Cache-Control', `public, max-age=${CACHE_DURATION / 1000}, s-maxage=${CACHE_DURATION / 1000}, stale-while-revalidate=${CACHE_DURATION / 1000}, stale-if-error=86400`);
     // Parse pagination parameters from query
     const featuredPage = parseInt(req.query.featuredPage, 10) || 1;
     const featuredLimit = parseInt(req.query.featuredLimit, 10) || 8;
@@ -28,6 +29,8 @@ router.get('/homepage-data', async (req, res) => {
     // Check cache first (with pagination-specific cache)
     const now = Date.now();
     if (homepageCache && homepageCache.cacheKey === cacheKey && cacheTimestamp && (now - cacheTimestamp) < CACHE_DURATION) {
+      // Strong client/proxy caching for cached response
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600, stale-if-error=86400');
       return res.json({
         success: true,
         cached: true,
@@ -154,6 +157,8 @@ router.get('/homepage-data', async (req, res) => {
     const endTime = Date.now();
     console.log(`Homepage data fetched in ${endTime - startTime}ms`);
 
+    // Fresh response: still allow short caching with SWR
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600, stale-if-error=86400');
     res.json({
       success: true,
       cached: false,
