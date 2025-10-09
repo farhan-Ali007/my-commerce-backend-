@@ -6,6 +6,7 @@ const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const mongoSanitize = require("express-mongo-sanitize");
 const xss = require("xss-clean");
+const compression = require("compression");
 const path = require("path");
 const { connectDB } = require("./db/connectDb");
 const userRouter = require("./routes/user.js");
@@ -42,8 +43,16 @@ const postexRouter = require("./routes/postex.js");
 dotenv.config();
 const app = express();
 
+// Production optimizations
+const isProduction = process.env.NODE_ENV === 'production';
+
 // Disable ETag to avoid 304 revalidation for dynamic endpoints
 app.set('etag', false);
+
+// Trust proxy in production (for Railway, Heroku, etc.)
+if (isProduction) {
+  app.set('trust proxy', 1);
+}
 
 // Security Middleware
 app.use(
@@ -84,6 +93,29 @@ app.use(
 
 app.use(mongoSanitize());
 app.use(xss());
+
+// Enable gzip compression for better performance
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  level: isProduction ? 6 : 1, // Higher compression in production
+  threshold: 1024, // Only compress responses larger than 1KB
+}));
+
+// Production caching headers for static assets
+if (isProduction) {
+  app.use('/uploads', express.static('uploads', {
+    maxAge: '1y', // Cache static files for 1 year
+    etag: true,
+    lastModified: true
+  }));
+} else {
+  app.use('/uploads', express.static('uploads'));
+}
 
 // Prevent caching for order endpoints (guest/user specific)
 app.use((req, res, next) => {
@@ -132,33 +164,23 @@ app.use(cookieParser());
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(express.json());
 
-// Serve static files from uploads directory
-app.use('/uploads', express.static('uploads'));
+// Static files already configured above with production optimizations
 
 // app.get('/', (req, res) => {
 //     res.send("<h1>Hello , welcome back</h1>")
-// })
-
 console.log("current running node version------>", process.version);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  if (!isProduction) {
+    console.error(err.stack);
+  }
+  
   res.status(err.status || 500).json({
     status: "error",
-    message: err.message || "Internal server error",
+    message: isProduction ? "Internal Server Error" : err.message,
+    ...(isProduction ? {} : { stack: err.stack })
   });
-});
-
-// Prevent caching for order endpoints (guest/user specific)
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api/v1/order')) {
-    res.set('Cache-Control', 'no-store');
-    res.set('Pragma', 'no-cache');
-    res.set('Surrogate-Control', 'no-store');
-    res.set('Vary', 'Origin, Cookie, Authorization, X-Guest-Id');
-  }
-  next();
 });
 
 // API Routes

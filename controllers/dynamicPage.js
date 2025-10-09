@@ -31,12 +31,27 @@ const getAllPages = async (req, res) => {
 const getPageBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
-    // Only return the page if it is published
-    const page = await DynamicPage.findOne({ slug, isPublished: true });
-    if (!page) return res.status(404).json({ error: "Page not found" });
+    console.log("Looking for page with slug:", slug);
+    
+    // Try to find page with exact slug first, then with trailing slash
+    let page = await DynamicPage.findOne({ slug, isPublished: true });
+    
+    // If not found, try with trailing slash
+    if (!page) {
+      page = await DynamicPage.findOne({ slug: slug + "/", isPublished: true });
+    }
+    
+    // If still not found, try without trailing slash (in case slug has one)
+    if (!page) {
+      const slugWithoutSlash = slug.endsWith("/") ? slug.slice(0, -1) : slug;
+      page = await DynamicPage.findOne({ slug: slugWithoutSlash, isPublished: true });
+    }
+    
+    console.log("Found page:", page ? "Yes" : "No");
+    if (!page) return res.status(404).json({ error: "Page not found or not published" });
     res.json(page);
   } catch (err) {
-    console.log("Error in getting page by slug");
+    console.log("Error in getting page by slug:", err.message);
     res.status(500).json({ error: err.message });
   }
 };
