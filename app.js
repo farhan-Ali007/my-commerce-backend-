@@ -24,6 +24,7 @@ const bannerRouter = require("./routes/banner.js");
 const brandRouter = require("./routes/brand.js");
 const sitemapRoute = require("./routes/sitemap");
 const dynamicPageRouter = require("./routes/dynamicPage");
+const blogRouter = require("./routes/blog");
 const notificationRouter = require("./routes/notification.js");
 const colorSettingsRouter = require("./routes/colorSettings.js");
 const popupRouter = require("./routes/popup.js");
@@ -191,6 +192,7 @@ app.use("/api/v1", homepageRouter);
 // Register sitemap route BEFORE dynamic page route to avoid conflicts
 app.use("/", sitemapRoute);
 app.use("/api/v1/page", dynamicPageRouter);
+app.use("/api/v1/blog", blogRouter);
 app.use("/", productFeedRouter);
 
 // // Serve frontend static files
@@ -215,5 +217,5 @@ const port = process.env.PORT || 3600;
 // Start server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
-  console.log(`Node.js version: ${process.version}`);
+  // console.log(`Node.js version: ${process.version}`);
 });
