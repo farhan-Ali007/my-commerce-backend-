@@ -41,9 +41,12 @@ router.get('/product-feed.csv', async (req, res) => {
     // Determine the maximum number of images for any product
     let maxAdditionalImages = 0;
     products.forEach(product => {
-      const numAdditional = (product.images && product.images.length > 1) ? product.images.length - 1 : 0;
+      const images = Array.isArray(product.images) ? product.images : [];
+      const numAdditional = images.length > 1 ? images.length - 1 : 0;
       if (numAdditional > maxAdditionalImages) maxAdditionalImages = numAdditional;
     });
+    
+    console.log(`Max additional images found: ${maxAdditionalImages}`);
 
     // Prepare headers
     const headers = [
@@ -56,7 +59,7 @@ router.get('/product-feed.csv', async (req, res) => {
         'channel',
         'feed label',
         'language',
-        'additional image link',
+        'additional_image_link',
         'all clicks',
         'brand',
         'canonical link',
@@ -101,7 +104,7 @@ router.get('/product-feed.csv', async (req, res) => {
         channel: 'online',
         'feed label': '', // set if you use feed labels
         language: 'en',
-        'additional image link': Array.isArray(product.images) && product.images.length > 1 ? toUrls(product.images.slice(1)).join(',') : '',
+        'additional_image_link': '', // Will be populated individually below
         'all clicks': '', // leave blank or fill if you track this
         brand: getBrandName(product.brand),
         'canonical link': `https://etimadmart.com/product/${product.slug}`,
@@ -116,11 +119,27 @@ router.get('/product-feed.csv', async (req, res) => {
         'shipping(country)': 'PK',
         'update type': '', // set if you use this
       };
-      // Add additional images
+      // Add all additional images properly
       if (Array.isArray(product.images) && product.images.length > 1) {
-        product.images.slice(1).forEach((img, idx) => {
-          row[idx === 0 ? 'additional_image_link' : `additional_image_link_${idx}`] = toUrl(img);
+        const additionalImages = product.images.slice(1); // Skip first image
+        additionalImages.forEach((img, idx) => {
+          const imageUrl = toUrl(img);
+          if (imageUrl) {
+            if (idx === 0) {
+              row['additional_image_link'] = imageUrl;
+            } else {
+              row[`additional_image_link_${idx}`] = imageUrl;
+            }
+          }
         });
+      }
+      
+      // Debug log for first few products
+      if (products.indexOf(product) < 3) {
+        console.log(`Product: ${product.title}, Images: ${product.images?.length || 0}`);
+        if (product.images?.length > 1) {
+          console.log('Additional images:', product.images.slice(1).map(toUrl));
+        }
       }
       csvStream.write(row);
     });
