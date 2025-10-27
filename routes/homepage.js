@@ -61,7 +61,7 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
       // Categories - schema doesn't have 'active'; select correct image field 'Image'
       Category.find({})
         .select('name slug Image menu')
-        .limit(12)
+        .limit(14)
         .lean(),
 
       // Brands - schema doesn't have 'active'; select correct logo field
