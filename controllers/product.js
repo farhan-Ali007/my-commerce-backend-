@@ -63,7 +63,8 @@ const createProduct = async (req, res) => {
             imageAlts,
             metaDescription,
             volumeTierEnabled,
-            volumeTiers
+            volumeTiers,
+            faqs
         } = req.body;
 
         console.log("Coming data----->", req.body)
@@ -89,6 +90,24 @@ const createProduct = async (req, res) => {
                 parsedVolumeTiers = JSON.parse(volumeTiers);
             } catch (error) {
                 return res.status(400).json({ message: "Invalid volume tiers data format." });
+            }
+        }
+
+        // Parse FAQs (optional)
+        let parsedFaqs = [];
+        if (faqs) {
+            try {
+                parsedFaqs = Array.isArray(faqs) ? faqs : JSON.parse(faqs);
+            } catch (error) {
+                return res.status(400).json({ message: "Invalid FAQs data format." });
+            }
+            if (!Array.isArray(parsedFaqs)) {
+                return res.status(400).json({ message: "FAQs must be an array." });
+            }
+            for (const f of parsedFaqs) {
+                if (!f || typeof f.question !== 'string' || typeof f.answer !== 'string' || f.question.trim() === '' || f.answer.trim() === '') {
+                    return res.status(400).json({ message: "Each FAQ must include non-empty 'question' and 'answer' strings." });
+                }
             }
         }
 
@@ -161,6 +180,7 @@ const createProduct = async (req, res) => {
             images: uploadedImages,
             freeShipping: isFreeShipping,
             deliveryCharges,
+            faqs: parsedFaqs,
             creator: currentUserId,
         });
 
@@ -301,6 +321,7 @@ const updateProduct = async (req, res) => {
             specialOfferEnd,
             volumeTierEnabled,
             volumeTiers,
+            faqs,
         } = req.body;
 
         console.log("categories from frontend:", categories, "subCategory from frontend:", subCategory);
@@ -314,6 +335,23 @@ const updateProduct = async (req, res) => {
 
         const parsedVariants = variants ? JSON.parse(variants) : null;
         const parsedVolumeTiers = volumeTiers ? JSON.parse(volumeTiers) : null;
+        // Parse FAQs (optional)
+        let parsedFaqs = null;
+        if (faqs !== undefined) {
+            try {
+                parsedFaqs = Array.isArray(faqs) ? faqs : JSON.parse(faqs);
+            } catch (error) {
+                return res.status(400).json({ message: "Invalid FAQs data format." });
+            }
+            if (!Array.isArray(parsedFaqs)) {
+                return res.status(400).json({ message: "FAQs must be an array." });
+            }
+            for (const f of parsedFaqs) {
+                if (!f || typeof f.question !== 'string' || typeof f.answer !== 'string' || f.question.trim() === '' || f.answer.trim() === '') {
+                    return res.status(400).json({ message: "Each FAQ must include non-empty 'question' and 'answer' strings." });
+                }
+            }
+        }
 
         if (title !== undefined) {
             product.title = title;
@@ -545,6 +583,9 @@ const updateProduct = async (req, res) => {
         product.variants = updatedVariants;
         product.volumeTiers = updatedVolumeTiers;
         product.metaDescription = metaDescription || product.metaDescription;
+        if (parsedFaqs !== null) {
+            product.faqs = parsedFaqs;
+        }
 
         await product.save();
 

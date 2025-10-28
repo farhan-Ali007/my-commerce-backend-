@@ -139,6 +139,12 @@ const productSchema = new mongoose.Schema({
             ref: 'Review',
         },
     ],
+    faqs: [
+        new mongoose.Schema({
+            question: { type: String, required: true, trim: true },
+            answer: { type: String, required: true, trim: true },
+        }, { _id: false })
+    ],
     creator: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
