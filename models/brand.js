@@ -17,8 +17,12 @@ const brandSchema = new mongoose.Schema({
     logo_public_id: {
         type: String
     },
+    alt: {
+        type: String,
+        trim: true,
+        default: ""
+    },
 }, { timestamps: true })
-
 
 const Brand = mongoose.model('Brand', brandSchema)
 module.exports = Brand;

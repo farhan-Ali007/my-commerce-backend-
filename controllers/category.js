@@ -1,12 +1,11 @@
 const Category = require('../models/category.js')
-const { uploadImage , deleteImage } = require('../config/cloudinary.js')
+const { uploadImage, deleteImage } = require('../config/cloudinary.js')
 const Sub = require('../models/subCategory.js')
 const slugify = require('slugify');
 
 const createCategory = async (req, res) => {
     try {
-
-        const { name, metaDescription } = req.body;
+        const { name, metaDescription, alt } = req.body;
         const file = req.file;
         if (!name)
             return res.status(400).json({ message: "Category name is required." })
@@ -14,38 +13,38 @@ const createCategory = async (req, res) => {
         const categoryName = name.toLowerCase();
         const categorySlug = slugify(categoryName, { lower: true, strict: true });
 
-
         if (!file)
             return res.status(400).json({ message: "Category image is required." })
 
-        let imageUrl;
-
+        let imageUrl = "";
+        let imagePublicId = "";
         try {
-            const uploadedImage = await uploadImage(file)
-            imageUrl = uploadedImage.url
-            imagePublicId = uploadedImage.public_id
+            const uploadedImage = await uploadImage(file);
+            imageUrl = uploadedImage.url;
+            imagePublicId = uploadedImage.public_id;
         } catch (error) {
-            console.log("Error in uploading category image")
+            return res.status(500).json({ message: "Failed to upload category image." });
         }
 
         const newCategory = new Category({
             name: categoryName,
             slug: categorySlug,
             Image: imageUrl,
+            alt: typeof alt === 'string' ? alt.trim() : "",
             metaDescription: metaDescription || "",
             imagePublicId: imagePublicId || ""
-        })
-        await newCategory.save()
+        });
+        await newCategory.save();
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             newCategory,
             message: "Category created."
-        })
+        });
 
     } catch (error) {
-        console.log("Error in creating category", error)
-        res.status(500).json({ message: "Internal server error" })
+        console.log("Error in creating category", error);
+        return res.status(500).json({ message: "Internal server error" });
     }
 }
 
@@ -53,8 +52,8 @@ const getAllCategories = async (req, res) => {
     try {
         // Fetch all categories
         const categories = await Category.find({})
-        .select("name slug Image menu metaDescription")
-        .sort({ createdAt: -1 });
+            .select("name slug Image alt menu metaDescription")
+            .sort({ createdAt: -1 });
 
         // For each category, populate its subcategories
         const categoriesWithSubcategories = await Promise.all(
@@ -113,36 +112,36 @@ const deleteCategory = async (req, res) => {
 
 const updateMenuStatus = async (req, res) => {
     try {
-      const { id } = req.params;
-      const { menu } = req.body;
-  
-      // Validate input
-      if (typeof menu !== 'boolean') {
-        return res.status(400).json({ message: "Invalid menu status" });
-      }
-  
-      const category = await Category.findByIdAndUpdate(
-        id,
-        { menu },
-        { new: true, runValidators: true }
-      );
-      
-      if (!category) {
-        return res.status(404).json({ message: "Category not found" });
-      }
-  
-      res.status(200).json({
-        success: true,
-        message: `Menu status ${menu ? 'enabled' : 'disabled'}`,
-        category,
-      });
+        const { id } = req.params;
+        const { menu } = req.body;
+
+        // Validate input
+        if (typeof menu !== 'boolean') {
+            return res.status(400).json({ message: "Invalid menu status" });
+        }
+
+        const category = await Category.findByIdAndUpdate(
+            id,
+            { menu },
+            { new: true, runValidators: true }
+        );
+
+        if (!category) {
+            return res.status(404).json({ message: "Category not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Menu status ${menu ? 'enabled' : 'disabled'}`,
+            category,
+        });
     } catch (error) {
-      console.error("Error updating menu status", error);
-      res.status(500).json({ message: "Internal server error" });
+        console.error("Error updating menu status", error);
+        res.status(500).json({ message: "Internal server error" });
     }
 };
 
-  const getMenuCategories = async (req, res) => {
+const getMenuCategories = async (req, res) => {
     try {
         const categories = await Category.find({ menu: true })
         const categoriesWithSubcategories = await Promise.all(
@@ -155,7 +154,7 @@ const updateMenuStatus = async (req, res) => {
             })
         );
 
-        res.status(200).json({ success: true, categories:categoriesWithSubcategories });
+        res.status(200).json({ success: true, categories: categoriesWithSubcategories });
     } catch (error) {
         console.error("Error fetching menu categories:", error);
         res.status(500).json({ success: false, message: "Failed to fetch menu categories" });
@@ -165,18 +164,22 @@ const updateMenuStatus = async (req, res) => {
 const editCategory = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, metaDescription } = req.body;
+        const { name, metaDescription , alt } = req.body;
         let updateData = {};
         const category = await Category.findById(id);
 
         if (!category) return res.status(404).json({ message: "Category not found" });
 
         if (name) {
-            updateData.name = name.toLowerCase();
-            updateData.slug = slugify(name, { lower: true, strict: true });
+            const lower = name.toLowerCase();
+            updateData.name = lower;
+            updateData.slug = slugify(lower, { lower: true, strict: true });
         }
         if (metaDescription !== undefined) {
             updateData.metaDescription = metaDescription;
+        }
+        if (alt !== undefined) {
+            updateData.alt = String(alt).trim();
         }
         if (req.file) {
             // Delete previous image from Cloudinary
@@ -196,4 +199,4 @@ const editCategory = async (req, res) => {
     }
 };
 
-module.exports = { createCategory, getAllCategories, deleteCategory, updateMenuStatus, getMenuCategories, editCategory } 
+module.exports = { createCategory, getAllCategories, deleteCategory, updateMenuStatus, getMenuCategories, editCategory }

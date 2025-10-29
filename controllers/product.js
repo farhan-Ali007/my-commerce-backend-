@@ -144,8 +144,16 @@ const createProduct = async (req, res) => {
         // Process tags
         const tagIds = await processTags(tagsArray);
 
-        // Upload images
-        const uploadedImages = await uploadImages(req.files.images);
+        // Upload images with optional alts (array aligned with images)
+        let parsedImageAlts = [];
+        if (imageAlts) {
+            try {
+                parsedImageAlts = Array.isArray(imageAlts) ? imageAlts : JSON.parse(imageAlts);
+            } catch (e) {
+                return res.status(400).json({ message: 'Invalid imageAlts format.' });
+            }
+        }
+        const uploadedImages = await uploadImages(req.files.images, parsedImageAlts);
 
         // Process variants
         const uploadedVariants = await processVariants(parsedVariants, req.files.variantImages);
@@ -238,12 +246,14 @@ const processTags = async (tagsArray) => {
     return tagIds;
 };
 
-// Update uploadImages to return array of { url, public_id }
-const uploadImages = async (images) => {
+// Update uploadImages to return array of { url, public_id, alt }
+const uploadImages = async (images, alts = []) => {
     const uploadedImages = [];
-    for (const file of images) {
+    for (let i = 0; i < images.length; i++) {
+        const file = images[i];
         const uploadedImage = await uploadImage(file);
-        uploadedImages.push({ url: uploadedImage.url, public_id: uploadedImage.public_id });
+        const alt = typeof alts[i] === 'string' ? alts[i] : '';
+        uploadedImages.push({ url: uploadedImage.url, public_id: uploadedImage.public_id, alt });
     }
     return uploadedImages;
 };
@@ -260,6 +270,7 @@ const processVariants = async (variants, variantImages) => {
             value: variant.value,
             price: variant.price ?? null,
             imageIndex: variant.imageIndex ?? null,
+            alt: variant.alt || '',
         });
     });
 
@@ -278,11 +289,13 @@ const processVariants = async (variants, variantImages) => {
                     value: value.value,
                     price: value.price,
                     image: uploadedImage.url, // Assign the uploaded image URL
+                    alt: value.alt || '',
                 });
             } else {
                 processedValues.push({
                     value: value.value,
                     price: value.price,
+                    alt: value.alt || '',
                 });
             }
         }
@@ -440,10 +453,40 @@ const updateProduct = async (req, res) => {
             updatedImages = [...JSON.parse(existingImages)];
         }
         if (req.files?.images && req.files.images.length > 0) {
-            // Append the new images to the existing ones
-            for (const file of req.files.images) {
+            // Append the new images to the existing ones with optional alt texts
+            let parsedNewImageAlts = [];
+            if (req.body.newImageAlts) {
+                try {
+                    parsedNewImageAlts = Array.isArray(req.body.newImageAlts) ? req.body.newImageAlts : JSON.parse(req.body.newImageAlts);
+                } catch (e) {
+                    return res.status(400).json({ message: 'Invalid newImageAlts format.' });
+                }
+            }
+            for (let i = 0; i < req.files.images.length; i++) {
+                const file = req.files.images[i];
                 const myImage = await uploadImage(file);
-                updatedImages.push({ url: myImage.url, public_id: myImage.public_id });
+                const alt = typeof parsedNewImageAlts[i] === 'string' ? parsedNewImageAlts[i] : '';
+                updatedImages.push({ url: myImage.url, public_id: myImage.public_id, alt });
+            }
+        }
+
+        // Apply alt updates for existing images if provided
+        if (req.body.imageAltUpdates) {
+            let updates = [];
+            try {
+                updates = Array.isArray(req.body.imageAltUpdates) ? req.body.imageAltUpdates : JSON.parse(req.body.imageAltUpdates);
+            } catch (e) {
+                return res.status(400).json({ message: 'Invalid imageAltUpdates format.' });
+            }
+            if (Array.isArray(updates) && updates.length > 0) {
+                const applyAlt = (imgObj) => {
+                    const match = updates.find(u => (u.public_id && imgObj.public_id === u.public_id) || (u.url && imgObj.url === u.url));
+                    if (match && typeof match.alt === 'string') {
+                        imgObj.alt = match.alt;
+                    }
+                    return imgObj;
+                };
+                updatedImages = updatedImages.map(applyAlt);
             }
         }
 
@@ -484,9 +527,9 @@ const updateProduct = async (req, res) => {
                         // If no new image uploaded, preserve the existing image from DB
                         if (existingVariant) {
                             const existingValue = existingVariant.values.find(ev => ev.value === val.value);
-                            if (existingValue && existingValue.image) {
-                                console.log(`Preserving existing image for "${val.value}":`, existingValue.image);
-                                return { ...val, image: existingValue.image };
+                            if (existingValue && (existingValue.image || existingValue.alt)) {
+                                console.log(`Preserving existing image/alt for "${val.value}":`, existingValue.image);
+                                return { ...val, image: existingValue.image, alt: (val.alt ?? existingValue.alt ?? '') };
                             }
                         }
                         

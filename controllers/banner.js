@@ -8,7 +8,7 @@ const addBanner = async (req, res) => {
             return res.status(400).json({ message: "Image file is required" });
         }
 
-        const { link, isActive } = req.body;
+        const { link, isActive, alt } = req.body;
         // console.log("Coming body----->", req.body);
         // console.log("Coming image------>", file)
         const uploadedImage = await uploadImage(file, "banner");
@@ -18,6 +18,7 @@ const addBanner = async (req, res) => {
             imagePublicId: uploadedImage.public_id,
             link,
             isActive: isActive || true,
+            alt: typeof alt === 'string' ? alt.trim() : ''
         });
 
         await newBanner.save();
@@ -71,7 +72,7 @@ const updateBanner = async (req, res) => {
 
         const updatedBanner = await Banner.findByIdAndUpdate(
             id,
-            { image: updatedImage, imagePublicId: updatedPublicId, link, isActive: isActive },
+            { image: updatedImage, imagePublicId: updatedPublicId, link, isActive: isActive, ...(alt !== undefined ? { alt: String(alt).trim() } : {}) },
             { new: true }
         );
 

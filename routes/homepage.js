@@ -54,19 +54,19 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
     ] = await Promise.all([
       // Banners - schema uses isActive
       Banner.find({ isActive: true })
-        .select('image link isActive')
+        .select('image link isActive alt')
         .limit(5)
         .lean(), // Use lean() for better performance
 
       // Categories - schema doesn't have 'active'; select correct image field 'Image'
       Category.find({})
-        .select('name slug Image menu')
+        .select('name slug Image menu alt metaDescription')
         .limit(14)
         .lean(),
 
       // Brands - schema doesn't have 'active'; select correct logo field
       Brand.find({})
-        .select('name slug logo')
+        .select('name slug logo alt metaDescription')
         .limit(10)
         .lean(),
 

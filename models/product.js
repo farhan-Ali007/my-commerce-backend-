@@ -10,6 +10,11 @@ const variantValueSchema = new mongoose.Schema({
         type: String,
         default: null,
     },
+    alt: {
+        type: String,
+        default: "",
+        trim: true,
+    },
     price: Number
 });
 
@@ -127,6 +132,11 @@ const productSchema = new mongoose.Schema({
             public_id: {
                 type: String,
                 required: true
+            },
+            alt: {
+                type: String,
+                default: "",
+                trim: true,
             }
         }
     ],

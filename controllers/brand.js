@@ -5,7 +5,7 @@ const { uploadImage, deleteImage } = require('../config/cloudinary')
 
 const createBrand = async (req, res) => {
     try {
-        const { name } = req.body
+        const { name, alt } = req.body
         const file = req.file;
 
         console.log("Coming name----->", name)
@@ -28,9 +28,11 @@ const createBrand = async (req, res) => {
             name: brandName,
             slug: brandSlug,
             logo: imageUrl,
-            logo_public_id: uploadedImage.public_id
+            logo_public_id: uploadedImage.public_id,
+            alt: typeof alt === 'string' ? alt.trim() : ''
         })
         await brand.save()
+
         res.status(201).json({
             message: "Brand created successfully.",
             brand
@@ -55,7 +57,7 @@ const getAllBrands = async (req, res) => {
 const updateBrand = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name } = req.body;
+        const { name, alt } = req.body;
         const file = req.file;
 
         console.log("Update brand id---->", id);
@@ -114,7 +116,8 @@ const updateBrand = async (req, res) => {
                 name: brandName,
                 slug: brandSlug,
                 logo: imageUrl,
-                logo_public_id: logo_public_id
+                logo_public_id: logo_public_id,
+                ...(alt !== undefined ? { alt: String(alt).trim() } : {})
             },
             { new: true }
         );
