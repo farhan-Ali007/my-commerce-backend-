@@ -13,11 +13,15 @@ const addBanner = async (req, res) => {
         // console.log("Coming image------>", file)
         const uploadedImage = await uploadImage(file, "banner");
 
+        const parsedIsActive = (typeof isActive === 'string')
+            ? ['true', '1', 'on', 'yes'].includes(isActive.toLowerCase())
+            : !!isActive;
+
         const newBanner = new Banner({
             image: uploadedImage.url,
             imagePublicId: uploadedImage.public_id,
             link,
-            isActive: isActive || true,
+            isActive: parsedIsActive,
             alt: typeof alt === 'string' ? alt.trim() : ''
         });
 
@@ -52,7 +56,7 @@ const getBanners = async (req, res) => {
 const updateBanner = async (req, res) => {
     try {
         const { id } = req.params;
-        const { link, isActive } = req.body;
+        const { link, isActive, alt } = req.body;
 
         const banner = await Banner.findById(id);
         if (!banner) {
@@ -60,7 +64,7 @@ const updateBanner = async (req, res) => {
         }
 
         let updatedImage = banner.image;
-        let updatedPublicId = banner.publicId;
+        let updatedPublicId = banner.imagePublicId;
 
         if (req.file) {
             await deleteImage(banner.imagePublicId);
@@ -70,9 +74,19 @@ const updateBanner = async (req, res) => {
         }
 
 
+        const updateDoc = { image: updatedImage, imagePublicId: updatedPublicId };
+        if (link !== undefined) updateDoc.link = link;
+        if (isActive !== undefined) {
+            const parsed = (typeof isActive === 'string')
+                ? ['true', '1', 'on', 'yes'].includes(isActive.toLowerCase())
+                : !!isActive;
+            updateDoc.isActive = parsed;
+        }
+        if (alt !== undefined) updateDoc.alt = String(alt).trim();
+
         const updatedBanner = await Banner.findByIdAndUpdate(
             id,
-            { image: updatedImage, imagePublicId: updatedPublicId, link, isActive: isActive, ...(alt !== undefined ? { alt: String(alt).trim() } : {}) },
+            updateDoc,
             { new: true }
         );
 
