@@ -1,0 +1,5 @@
+version: 1
+pull_requests:
+  review:
+    enabled: true
+    comment_mode: inline
