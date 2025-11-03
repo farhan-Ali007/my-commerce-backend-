@@ -644,6 +644,7 @@ const combinedFilter = async (req, res) => {
                 .populate('subCategory', 'name slug')
                 .populate('brand', 'name slug')
                 .populate('tags', 'name')
+                .select('title price salePrice images slug stock averageRating freeShipping categories subCategory brand tags createdAt')
                 .sort(sortObj)
                 .skip(skip)
                 .limit(limitNum),

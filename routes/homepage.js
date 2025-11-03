@@ -201,7 +201,7 @@ async function getProductsByTag(tagName, limit = 8, sort = {}, page = 1) {
     const query = Product.find({ tags: { $in: [tag._id] } })
       .populate('categories', 'name slug')
       .populate('brand', 'name slug')
-      .select('title price salePrice images slug stock averageRating')
+      .select('title price salePrice images slug stock averageRating freeShipping')
       .skip(skip)
       .limit(limit)
       .lean();
@@ -242,7 +242,7 @@ async function getProductsByCategory(categorySlug, limit = 4) {
     })
       .populate('categories', 'name slug')
       .populate('brand', 'name slug')
-      .select('title price salePrice images slug stock averageRating')
+      .select('title price salePrice images slug stock averageRating freeShipping')
       .limit(limit)
       .lean();
 
