@@ -168,7 +168,7 @@ app.use(express.json());
 
 // app.get('/', (req, res) => {
 //     res.send("<h1>Hello , welcome back</h1>")
-console.log("current running node version------>", process.version);
+console.log("current runnning node version------>", process.version);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
