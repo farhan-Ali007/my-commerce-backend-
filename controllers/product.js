@@ -698,6 +698,7 @@ const getAllProducts = async (req, res) => {
 const getProductBySlug = async (req, res) => {
     try {
         const { slug } = req.params;
+        const { regionId } = req.query || {};
         // Try to find the product by current slug
         let product = await Product.findOne({ slug })
             .populate('categories', 'name slug')
@@ -719,11 +720,26 @@ const getProductBySlug = async (req, res) => {
             const averageRating = product.reviews.length > 0 ? totalRating / product.reviews.length : 0;
             product.averageRating = averageRating;
             await product.save();
+
+            // Compute regional resolution (non-persistent)
+            const source = product?.regionalPricing || product?.regionPricing || product?.regions || {};
+            const regionObj = regionId && typeof source === 'object' ? source[regionId] : null;
+            const resolvedPrice = (regionObj && typeof regionObj.price === 'number')
+                ? regionObj.price
+                : (regionObj && typeof regionObj.finalPrice === 'number')
+                    ? regionObj.finalPrice
+                    : (product.salePrice ?? product.price);
+            const resolvedAvailability = (regionObj && regionObj.availability)
+                ? regionObj.availability
+                : (product.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock');
+
+            const productJson = product.toObject();
             return res.status(200).json({
                 success: true,
                 message: 'Product fetched successfully',
-                product,
-                averageRating
+                product: productJson,
+                averageRating,
+                resolvedRegional: regionId ? { regionId, price: resolvedPrice, availability: resolvedAvailability } : null,
             });
         }
 

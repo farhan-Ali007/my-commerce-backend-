@@ -546,6 +546,126 @@ const filterByPriceRange = async (req, res) => {
 
 
 
+const combinedFilter = async (req, res) => {
+    try {
+        const {
+            page = 1,
+            limit = 16,
+            sort,
+            brand,
+            rating,
+            minPrice,
+            maxPrice,
+            subcategory,
+        } = req.query;
+
+        // Accept categories[] or categoryName[]
+        let categories = req.query.categories || req.query.categoryName || [];
+        if (!Array.isArray(categories)) {
+            categories = typeof categories === 'string' && categories ? [categories] : [];
+        }
+
+        const pageNum = Math.max(1, parseInt(page, 10) || 1);
+        const limitNum = Math.max(1, parseInt(limit, 10) || 16);
+        const skip = (pageNum - 1) * limitNum;
+
+        // Build filter query
+        const query = {};
+
+        // Category filter
+        if (categories.length > 0) {
+            const categoryDocs = await Category.find({
+                $or: [
+                    { slug: { $in: categories } },
+                    { name: { $in: categories } }
+                ]
+            });
+            if (categoryDocs.length > 0) {
+                const categoryIds = categoryDocs.map(cat => cat._id);
+                query.categories = { $in: categoryIds };
+            }
+        }
+
+        // Subcategory filter
+        if (subcategory) {
+            const subCategoryDoc = await Sub.findOne({
+                $or: [
+                    { slug: subcategory },
+                    { name: subcategory }
+                ]
+            });
+            if (subCategoryDoc) {
+                query.subCategory = subCategoryDoc._id;
+            }
+        }
+
+        // Brand filter
+        if (brand) {
+            const brandDoc = await Brand.findOne({
+                $or: [
+                    { slug: brand },
+                    { name: brand }
+                ]
+            });
+            if (brandDoc) {
+                query.brand = brandDoc._id;
+            }
+        }
+
+        // Rating filter (using averageRating like other functions)
+        if (rating) {
+            const r = parseFloat(rating);
+            if (!isNaN(r)) {
+                query.averageRating = { $gte: r };
+            }
+        }
+
+        // Price range filter
+        const pMin = minPrice != null ? parseFloat(minPrice) : null;
+        const pMax = maxPrice != null ? parseFloat(maxPrice) : null;
+        if (!isNaN(pMin) || !isNaN(pMax)) {
+            query.price = {};
+            if (!isNaN(pMin)) query.price.$gte = pMin;
+            if (!isNaN(pMax)) query.price.$lte = pMax;
+        }
+
+        // Sorting
+        const sortMap = {
+            price_asc: { price: 1 },
+            price_desc: { price: -1 },
+            newest: { createdAt: -1 },
+        };
+        const sortObj = sortMap[sort] || { createdAt: -1 };
+
+        // Execute query with pagination
+        const [products, totalProducts] = await Promise.all([
+            Product.find(query)
+                .populate('categories', 'name slug')
+                .populate('subCategory', 'name slug')
+                .populate('brand', 'name slug')
+                .populate('tags', 'name')
+                .sort(sortObj)
+                .skip(skip)
+                .limit(limitNum),
+            Product.countDocuments(query),
+        ]);
+
+        const totalPages = Math.ceil(totalProducts / limitNum);
+
+        res.status(200).json({
+            success: true,
+            message: 'Products filtered successfully.',
+            products,
+            totalProducts,
+            currentPage: pageNum,
+            totalPages,
+        });
+    } catch (error) {
+        console.error('combinedFilter error:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
+
 module.exports = {
     liveSearch,
     sortByPrice,
@@ -554,5 +674,6 @@ module.exports = {
     filterByRating,
     filterProductsbyBrands,
     filterByPriceRange,
-    getMinMaxPrice
+    getMinMaxPrice,
+    combinedFilter
 };

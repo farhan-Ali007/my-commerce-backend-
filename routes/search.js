@@ -9,7 +9,8 @@ const {
     filterProductsbyBrands,
     filterByPriceRange,
     filterBySubCategory,
-    getMinMaxPrice } = require('../controllers/search');
+    getMinMaxPrice,
+    combinedFilter } = require('../controllers/search');
 
 
 router.get('/', liveSearch);
@@ -25,6 +26,8 @@ router.get('/filter/price', sortByPrice);
 router.get('/filter/category', filterByCategory);
 
 router.get('/filter/subcategory', filterBySubCategory);
+
+router.get('/filter/combined', combinedFilter);
 
 router.get('/filter/:brand', filterProductsbyBrands);
 
