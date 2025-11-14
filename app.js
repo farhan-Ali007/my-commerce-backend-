@@ -72,6 +72,7 @@ app.use(
           "https://etimadmart.com/api/v1",
           "https://www.google-analytics.com",
           "https://www.facebook.com",
+          "https://analytics.tiktok.com",
           "https://*.us-central1.run.app",
           "https://mpc-prod-1-1053047382554.us-central1.run.app",
           "https://mpc-prod-2-1053047382554.us-central1.run.app",
@@ -132,7 +133,7 @@ app.use((req, res, next) => {
 app.use(
   cors({
     origin: [
-      "http://localhost:5173", 
+      "http://localhost:5173",
       "https://etimadmart.com",
       "https://www.etimadmart.com",
       "https://www.etimadmart.com",
@@ -175,7 +176,7 @@ app.use((err, req, res, next) => {
   if (!isProduction) {
     console.error(err.stack);
   }
-  
+
   res.status(err.status || 500).json({
     status: "error",
     message: isProduction ? "Internal Server Error" : err.message,
