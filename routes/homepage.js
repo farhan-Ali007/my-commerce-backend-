@@ -10,11 +10,11 @@ let homepageCache = null;
 let cacheTimestamp = null;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-  // Combined homepage data endpoint - Single API call for all homepage content
-  router.get('/homepage-data', async (req, res) => {
-    try {
-      // Set HTTP cache headers for better client/proxy caching
-      res.setHeader('Cache-Control', `public, max-age=${CACHE_DURATION / 1000}, s-maxage=${CACHE_DURATION / 1000}, stale-while-revalidate=${CACHE_DURATION / 1000}, stale-if-error=86400`);
+// Combined homepage data endpoint - Single API call for all homepage content
+router.get('/homepage-data', async (req, res) => {
+  try {
+    // Set HTTP cache headers for better client/proxy caching
+    res.setHeader('Cache-Control', `public, max-age=${CACHE_DURATION / 1000}, s-maxage=${CACHE_DURATION / 1000}, stale-while-revalidate=${CACHE_DURATION / 1000}, stale-if-error=86400`);
     // Parse pagination parameters from query
     const featuredPage = parseInt(req.query.featuredPage, 10) || 1;
     const featuredLimit = parseInt(req.query.featuredLimit, 10) || 8;
@@ -22,10 +22,10 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
     const newLimit = parseInt(req.query.newLimit, 10) || 8;
     const bestPage = parseInt(req.query.bestPage, 10) || 1;
     const bestLimit = parseInt(req.query.bestLimit, 10) || 5;
-    
+
     // Create cache key based on pagination params
     const cacheKey = `${featuredPage}-${featuredLimit}-${newPage}-${newLimit}-${bestPage}-${bestLimit}`;
-    
+
     // Check cache first (with pagination-specific cache)
     const now = Date.now();
     if (homepageCache && homepageCache.cacheKey === cacheKey && cacheTimestamp && (now - cacheTimestamp) < CACHE_DURATION) {
@@ -168,8 +168,8 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
   } catch (error) {
     console.error('Homepage data error:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Failed to load homepage data',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -181,7 +181,7 @@ async function getProductsByTag(tagName, limit = 8, sort = {}, page = 1) {
   try {
     const Tag = require('../models/tag');
     const tag = await Tag.findOne({ name: new RegExp(tagName, 'i') }).lean();
-    
+
     if (!tag) {
       console.log(`Tag "${tagName}" not found, returning empty array`);
       return {
@@ -201,7 +201,7 @@ async function getProductsByTag(tagName, limit = 8, sort = {}, page = 1) {
     const query = Product.find({ tags: { $in: [tag._id] } })
       .populate('categories', 'name slug')
       .populate('brand', 'name slug')
-      .select('title price salePrice images slug stock averageRating freeShipping')
+      .select('title price salePrice images slug stock averageRating freeShipping isDod dodPrice dodStart dodEnd')
       .skip(skip)
       .limit(limit)
       .lean();
@@ -237,12 +237,12 @@ async function getProductsByCategory(categorySlug, limit = 4) {
     const category = await Category.findOne({ slug: categorySlug }).lean();
     if (!category) return [];
 
-    const products = await Product.find({ 
-      categories: category._id 
+    const products = await Product.find({
+      categories: category._id
     })
       .populate('categories', 'name slug')
       .populate('brand', 'name slug')
-      .select('title price salePrice images slug stock averageRating freeShipping')
+      .select('title price salePrice images slug stock averageRating freeShipping isDod dodPrice dodStart dodEnd')
       .limit(limit)
       .lean();
 
@@ -267,8 +267,8 @@ cacheTimestamp = null;
 
 // Health check endpoint
 router.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: Date.now(),
     cacheStatus: homepageCache ? 'cached' : 'empty'
   });
