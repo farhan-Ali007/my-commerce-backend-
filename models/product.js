@@ -111,6 +111,21 @@ const productSchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
+    // Deal of the Day pricing
+    isDod: {
+        type: Boolean,
+        default: false,
+    },
+    dodPrice: {
+        type: Number,
+        min: 0,
+    },
+    dodStart: {
+        type: Date,
+    },
+    dodEnd: {
+        type: Date,
+    },
     brand: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Brand',

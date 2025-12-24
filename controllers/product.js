@@ -64,7 +64,12 @@ const createProduct = async (req, res) => {
             metaDescription,
             volumeTierEnabled,
             volumeTiers,
-            faqs
+            faqs,
+            // Deal of the Day fields
+            isDod,
+            dodPrice,
+            dodStart,
+            dodEnd,
         } = req.body;
 
         console.log("Coming data----->", req.body)
@@ -165,6 +170,12 @@ const createProduct = async (req, res) => {
         const isFreeShipping = freeShipping === 'true' || freeShipping === true;
         const isVolumeTierEnabled = volumeTierEnabled === 'true' || volumeTierEnabled === true;
         const deliveryCharges = isFreeShipping ? 0 : 250;
+
+        // **Handle Deal of the Day fields**
+        const dodEnabled = isDod === 'true' || isDod === true;
+        const normalizedDodPrice = dodPrice != null && dodPrice !== '' ? Number(dodPrice) : null;
+        const dodStartDate = dodStart ? new Date(dodStart) : null;
+        const dodEndDate = dodEnd ? new Date(dodEnd) : null;
         // Create product
         const currentUserId = req.user.id;
         const newProduct = new Product({
@@ -190,6 +201,11 @@ const createProduct = async (req, res) => {
             deliveryCharges,
             faqs: parsedFaqs,
             creator: currentUserId,
+            // Deal of the Day
+            isDod: dodEnabled,
+            dodPrice: normalizedDodPrice,
+            dodStart: dodStartDate,
+            dodEnd: dodEndDate,
         });
 
         console.log("Final slug after slugify (createProduct):", newProduct.slug);
@@ -335,6 +351,11 @@ const updateProduct = async (req, res) => {
             volumeTierEnabled,
             volumeTiers,
             faqs,
+            // Deal of the Day fields
+            isDod,
+            dodPrice,
+            dodStart,
+            dodEnd,
         } = req.body;
 
         console.log("categories from frontend:", categories, "subCategory from frontend:", subCategory);
@@ -612,6 +633,24 @@ const updateProduct = async (req, res) => {
             product.specialOfferStart = null;
             product.specialOfferEnd = null;
             product.specialOfferPrice = null;
+        }
+
+        // Deal of the Day fields
+        if (isDod !== undefined) {
+            const dodEnabled = isDod === 'true' || isDod === true;
+            product.isDod = dodEnabled;
+
+            if (dodEnabled) {
+                if (dodPrice !== undefined && dodPrice !== '') {
+                    product.dodPrice = Number(dodPrice);
+                }
+                product.dodStart = dodStart ? new Date(dodStart) : product.dodStart;
+                product.dodEnd = dodEnd ? new Date(dodEnd) : product.dodEnd;
+            } else {
+                product.dodPrice = null;
+                product.dodStart = null;
+                product.dodEnd = null;
+            }
         }
 
         product.title = title || product.title;
