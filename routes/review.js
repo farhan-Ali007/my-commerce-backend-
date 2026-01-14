@@ -4,7 +4,7 @@ const express = require('express')
 const router = express.Router()
 const { isAuthorized } = require('../middlewares/auth')
 const multer = require('multer');
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: process.env.VERCEL ? "/tmp/uploads" : "uploads/" });
 
 router.post('/create/:productSlug/:reviewerId', isAuthorized, upload.array('images', 5), createReview)
 router.get('/all', getAllReviews)

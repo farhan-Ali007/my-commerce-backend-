@@ -1,6 +1,6 @@
 const express = require('express')
 const multer = require('multer')
-const upload = multer({ dest: "uploads/" })
+const upload = multer({ dest: process.env.VERCEL ? "/tmp/uploads" : "uploads/" })
 const { isAuthorized, isAdmin } = require('../middlewares/auth.js')
 const { signup, login, logout, getUser, getAllUsers, updateUserRole, deleteUser, updateUserStatus, updateLastActive } = require('../controllers/user.js')
 const router = express.Router()

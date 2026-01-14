@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: process.env.VERCEL ? "/tmp/uploads" : "uploads/" });
 const { createSub, getAllSubs, deleteSub, editSub, getSubCategoryBySlug } = require('../controllers/subCategory');
 const { isAuthorized, isAdmin } = require('../middlewares/auth')
 
