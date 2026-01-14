@@ -130,35 +130,50 @@ app.use((req, res, next) => {
 });
 
 // CORS configuration
-app.use(
-  cors({
-    origin: [
-      "http://localhost:5173",
-      "https://etimadmart.com",
-      "https://www.etimadmart.com",
-      "https://www.etimadmart.com",
-      "https://etimadmart.netlify.app",
-      "https://dev--etimadmart.netlify.app",
-      "https://*.netlify.app"  // Allow all Netlify preview URLs
-    ],
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "X-Requested-With",
-      "X-Client",
-      "X-Guest-Id",
-      "X-Guest-Id",
-      "Accept",
-      "Origin",
-      "Cookie"
-    ],
-  })
-);
+const allowedOrigins = new Set([
+  "http://localhost:5173",
+  "https://etimadmart.com",
+  "https://www.etimadmart.com",
+  "https://etimadmart.netlify.app",
+  "https://dev--etimadmart.netlify.app"
+]);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    try {
+      const { hostname } = new URL(origin);
+      const isNetlifyPreview = hostname.endsWith(".netlify.app");
+      if (allowedOrigins.has(origin) || isNetlifyPreview) {
+        return callback(null, true);
+      }
+    } catch (e) {
+      return callback(e);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "X-Client",
+    "X-Guest-Id",
+    "Accept",
+    "Origin",
+    "Cookie"
+  ],
+};
+
+app.use(cors(corsOptions));
 
 // Ensure preflight requests are handled properly
-app.options("*", cors());
+app.options("*", cors(corsOptions));
 
 // Body parsing middleware
 app.use(cookieParser());
