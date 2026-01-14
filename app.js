@@ -231,15 +231,15 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok", version: process.version });
 });
 
-// Connect to database
-connectDB();
-
 
 // Use cPanel's provided port or fallback to 3000
 const port = process.env.PORT || 3600;
 // const host = process.env.HOST || '0.0.0.0';
 
 if (require.main === module) {
+  // Connect to database
+  connectDB();
+
   // Start server
   app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
