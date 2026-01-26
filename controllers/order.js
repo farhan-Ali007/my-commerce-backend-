@@ -484,13 +484,42 @@ const getRecentOrders = async (req, res) => {
     const last24Hours = new Date();
     last24Hours.setDate(last24Hours.getDate() - 1);
 
-    const recentOrders = await Order.find({ orderedAt: { $gte: last24Hours } })
-      .populate("cartSummary.product", "title price")
-      .populate("orderedBy", "username mobile streetAddress")
-      .sort({ orderedAt: -1 });
+    // Use aggregation pipeline like searchOrders to ensure all fields are included
+    const pipeline = [
+      { $match: { orderedAt: { $gte: last24Hours } } },
+      { $sort: { orderedAt: -1 } },
+      {
+        $project: {
+          orderedBy: 1,
+          guestId: 1,
+          shippingAddress: 1,
+          cartSummary: 1,
+          deliveryCharges: 1,
+          freeShipping: 1,
+          totalPrice: 1,
+          status: 1,
+          source: 1,
+          orderedAt: 1,
+        },
+      },
+    ];
+
+    const recentOrders = await Order.aggregate(pipeline);
+    
+    // Populate product and user data
+    const idsInOrder = recentOrders.map((d) => d._id);
+    let populatedOrders = [];
+    if (idsInOrder.length) {
+      const found = await Order.find({ _id: { $in: idsInOrder } })
+        .populate("cartSummary.product", "title price")
+        .populate("orderedBy", "username mobile streetAddress");
+      const map = new Map(found.map((o) => [String(o._id), o]));
+      populatedOrders = idsInOrder.map((id) => map.get(String(id))).filter(Boolean);
+    }
+
     res.status(200).json({
       success: true,
-      orders: recentOrders,
+      orders: populatedOrders,
     });
   } catch (error) {
     console.error("Error fetching recent orders:", error);
